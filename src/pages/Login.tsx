@@ -105,7 +105,7 @@ const Login = () => {
                 <Package className="text-blue-400" size={32} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Idyle Bella Shop</h1>
+                <h1 className="text-2xl font-bold text-white">MyBusiness CRM</h1>
                 <p className="text-blue-400 text-sm">Business Management System</p>
               </div>
             </div>

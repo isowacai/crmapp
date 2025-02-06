@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, orderBy, where, QueryConstraint } from 'firebase/firestore';
+import { getFirestore, collection, orderBy, QueryConstraint } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -21,8 +21,9 @@ export const COLLECTIONS = {
   USERS: 'users',
   CUSTOMERS: 'customers',
   PRODUCTS: 'products',
-  TASKS: 'tasks',
-  CATEGORIES: 'categories'
+  CATEGORIES: 'categories',
+  ORDERS: 'orders',
+  TASKS: 'tasks'
 } as const;
 
 // Helper functions for common queries

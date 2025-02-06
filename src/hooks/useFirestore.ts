@@ -10,7 +10,6 @@ import {
   DocumentData,
   QueryConstraint,
   Timestamp,
-  where,
   orderBy
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -23,7 +22,10 @@ interface UseFirestoreOptions {
 
 interface BaseDocument {
   id: string;
-  createdAt: Timestamp;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
 }
 
 export function useFirestore<T extends DocumentData>({ 

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, Timestamp, getDocs, query, doc, setDoc, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, Timestamp, getDocs, query, doc, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
@@ -73,6 +73,44 @@ const createSampleData = () => ({
       createdAt: Timestamp.now()
     }
   ],
+  orders: [
+    {
+      customerId: '',  // Will be set after customer creation
+      customerName: 'John Smith',
+      items: [
+        {
+          productId: '',  // Will be set after product creation
+          productName: 'Premium Software License',
+          quantity: 2,
+          price: 299.99
+        }
+      ],
+      status: 'completed',
+      totalAmount: 599.98,
+      notes: 'Initial order for software licenses',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: 'admin@example.com'
+    },
+    {
+      customerId: '',  // Will be set after customer creation
+      customerName: 'Sarah Johnson',
+      items: [
+        {
+          productId: '',  // Will be set after product creation
+          productName: 'Cloud Storage Plan',
+          quantity: 1,
+          price: 99.99
+        }
+      ],
+      status: 'processing',
+      totalAmount: 99.99,
+      notes: 'Cloud storage subscription',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy: 'manager@example.com'
+    }
+  ],
   tasks: [
     {
       title: 'Follow up with Tech Corp',
@@ -105,50 +143,6 @@ const createSampleData = () => ({
     {
       name: 'Services',
       createdAt: Timestamp.now()
-    },
-    {
-      name: 'Cloud Solutions',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Security',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Networking',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Storage',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Mobile',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'IoT',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'AI/ML Solutions',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Consulting',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Support',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Training',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Other',
-      createdAt: Timestamp.now()
     }
   ]
 });
@@ -175,17 +169,20 @@ const loadCollectionData = async (collectionName, data) => {
       return;
     }
 
+    const createdDocs = [];
     for (const item of data) {
       if (collectionName === 'users') {
-        // For users, use email as document ID
         await setDoc(doc(db, collectionName, item.id), item);
+        createdDocs.push({ id: item.id, ...item });
       } else {
-        await addDoc(collection(db, collectionName), item);
+        const docRef = await addDoc(collection(db, collectionName), item);
+        createdDocs.push({ id: docRef.id, ...item });
       }
       console.log(`Added document to ${collectionName}`);
     }
     
     console.log(`${collectionName} loaded successfully`);
+    return createdDocs;
   } catch (error) {
     console.error(`Error loading ${collectionName}:`, error);
     throw error;
@@ -197,10 +194,22 @@ const loadInitialData = async () => {
     console.log('Starting data load...');
     const sampleData = createSampleData();
     
-    // Load collections sequentially
+    // Load collections in order to maintain references
+    const customers = await loadCollectionData('customers', sampleData.customers);
+    const products = await loadCollectionData('products', sampleData.products);
+    
+    // Update order references
+    if (customers && products) {
+      sampleData.orders[0].customerId = customers[0].id;
+      sampleData.orders[0].items[0].productId = products[0].id;
+      
+      sampleData.orders[1].customerId = customers[1].id;
+      sampleData.orders[1].items[0].productId = products[1].id;
+    }
+    
+    // Load remaining collections
     await loadCollectionData('users', sampleData.users);
-    await loadCollectionData('customers', sampleData.customers);
-    await loadCollectionData('products', sampleData.products);
+    await loadCollectionData('orders', sampleData.orders);
     await loadCollectionData('tasks', sampleData.tasks);
     await loadCollectionData('categories', sampleData.categories);
 

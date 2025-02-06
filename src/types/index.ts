@@ -6,6 +6,10 @@ export interface Customer {
   company: string;
   status: 'active' | 'inactive';
   lastContact: string;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
 }
 
 export interface Product {
@@ -15,6 +19,10 @@ export interface Product {
   category: string;
   stock: number;
   description: string;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
 }
 
 export interface Task {
@@ -25,6 +33,10 @@ export interface Task {
   dueDate: string;
   assignedTo: string;
   priority: 'low' | 'medium' | 'high';
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
 }
 
 export type UserRole = 'admin' | 'manager' | 'customer';
@@ -37,4 +49,27 @@ export interface User {
   lastLogin: Date;
   createdAt: Date;
   active: boolean;
+}
+
+export interface OrderItem {
+  productId: string;
+  quantity: number;
+  price: number;
+  productName: string;
+}
+
+export interface Order {
+  id: string;
+  customerId: string;
+  customerName: string;
+  items: OrderItem[];
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  totalAmount: number;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
+  updatedAt: Date;
+  notes?: string;
+  createdBy: string;
 }

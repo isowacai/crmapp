@@ -22,7 +22,6 @@ const initialFormData: TaskFormData = {
   priority: 'medium'
 };
 
-// Memoized form component
 const TaskForm = memo(({
   onSubmit,
   onCancel,
@@ -132,7 +131,6 @@ const TaskForm = memo(({
 
 TaskForm.displayName = 'TaskForm';
 
-// Memoized task card component
 const TaskCard = memo(({
   task,
   onView,
@@ -250,7 +248,6 @@ const Tasks = () => {
       setSelectedTask(null);
     } catch (error) {
       console.error('Error handling task:', error);
-      // Handle error appropriately
     }
   };
 
@@ -262,7 +259,6 @@ const Tasks = () => {
         setSelectedTask(null);
       } catch (error) {
         console.error('Error deleting task:', error);
-        // Handle error appropriately
       }
     }
   };
@@ -275,16 +271,6 @@ const Tasks = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="p-8">
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg">
-          Error loading tasks: {error.message}
-        </div>
-      </div>
-    );
-  }
-
   const tasksByStatus = {
     pending: tasks.filter(task => task.status === 'pending'),
     'in-progress': tasks.filter(task => task.status === 'in-progress'),
@@ -292,7 +278,7 @@ const Tasks = () => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 h-screen flex flex-col">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold">Tasks</h1>
@@ -330,128 +316,140 @@ const Tasks = () => {
         </button>
       </div>
 
-      {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {Object.entries(tasksByStatus).map(([status, statusTasks]) => (
-            <div key={status} className="card p-6">
-              <h2 className="text-xl font-semibold mb-6 capitalize flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${
-                  status === 'pending' ? 'bg-amber-500' :
-                  status === 'in-progress' ? 'bg-blue-500' :
-                  'bg-emerald-500'
-                }`} />
-                {status.replace('-', ' ')}
-                <span className="ml-2 text-sm text-gray-500">
-                  ({statusTasks.length})
-                </span>
-              </h2>
-              <div className="space-y-4">
-                {statusTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onView={handleView}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="card">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assigned To
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Priority
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="font-medium">{task.title}</div>
-                        <div className="text-sm text-gray-600">{task.description}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        task.status === 'completed'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : task.status === 'in-progress'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {task.status.replace('-', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {task.dueDate}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {task.assignedTo}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        task.priority === 'high'
-                          ? 'bg-red-100 text-red-800'
-                          : task.priority === 'medium'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {task.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button 
-                        onClick={() => handleView(task)}
-                        className="btn-icon text-blue-600 hover:bg-blue-50" 
-                        title="View"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleEdit(task)}
-                        className="btn-icon text-amber-600 hover:bg-amber-50" 
-                        title="Edit"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(task)}
-                        className="btn-icon text-red-600 hover:bg-red-50" 
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {error && (
+        <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-600 border border-red-200">
+          {error.message}
         </div>
       )}
+
+      <div className="flex-1 overflow-hidden">
+        {viewMode === 'kanban' ? (
+          <div className="h-full flex gap-6 overflow-x-auto pb-6 custom-scrollbar">
+            {Object.entries(tasksByStatus).map(([status, statusTasks]) => (
+              <div key={status} className="flex-shrink-0 w-80">
+                <div className="card p-6 h-full flex flex-col">
+                  <h2 className="text-xl font-semibold mb-6 capitalize flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full ${
+                      status === 'pending' ? 'bg-amber-500' :
+                      status === 'in-progress' ? 'bg-blue-500' :
+                      'bg-emerald-500'
+                    }`} />
+                    {status.replace('-', ' ')}
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({statusTasks.length})
+                    </span>
+                  </h2>
+                  <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4">
+                      {statusTasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onView={handleView}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card overflow-hidden">
+            <div className="overflow-y-auto custom-scrollbar max-h-[calc(100vh-12rem)]">
+              <table className="w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr className="border-b border-gray-100">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Title
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Due Date
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Assigned To
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {tasks.map((task) => (
+                    <tr key={task.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="font-medium">{task.title}</div>
+                          <div className="text-sm text-gray-600">{task.description}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          task.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : task.status === 'in-progress'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {task.status.replace('-', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {task.dueDate}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {task.assignedTo}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          task.priority === 'high'
+                            ? 'bg-red-100 text-red-800'
+                            : task.priority === 'medium'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {task.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button 
+                          onClick={() => handleView(task)}
+                          className="btn-icon text-blue-600 hover:bg-blue-50" 
+                          title="View"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleEdit(task)}
+                          className="btn-icon text-amber-600 hover:bg-amber-50" 
+                          title="Edit"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(task)}
+                          className="btn-icon text-red-600 hover:bg-red-50" 
+                          title="Delete"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Add/Edit Modal */}
       {(isAddOpen || isEditOpen) && (

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, CheckSquare, LogOut, User, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, Package, CheckSquare, LogOut, User, Shield, ShoppingBag, Tags } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar = () => {
@@ -10,7 +10,9 @@ const Sidebar = () => {
   const links = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/customers', icon: Users, label: 'Customers' },
-    { to: '/products', icon: Package, label: 'Products' },
+    { to: '/products', icon: Package, label: 'Products', managerAccess: true },
+    { to: '/categories', icon: Tags, label: 'Categories', managerAccess: true },
+    { to: '/orders', icon: ShoppingBag, label: 'Orders', managerAccess: true },
     { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { to: '/users', icon: Shield, label: 'Users', adminOnly: true },
   ];
@@ -24,15 +26,17 @@ const Sidebar = () => {
     }
   };
 
-  const filteredLinks = links.filter(link => 
-    !link.adminOnly || user?.role === 'admin'
-  );
+  const filteredLinks = links.filter(link => {
+    if (link.adminOnly) return user?.role === 'admin';
+    if (link.managerAccess) return user?.role === 'admin' || user?.role === 'manager';
+    return true;
+  });
 
   return (
     <div className="bg-gray-900 text-white w-64 min-h-screen p-6 flex flex-col">
       <div className="text-xl font-bold mb-10 pl-2 flex items-center gap-2 whitespace-nowrap">
         <Package className="text-blue-500 shrink-0" size={24} />
-        <span>Idyle Bella Shop</span>
+        <span>MyBusiness CRM</span>
       </div>
 
       {user && (

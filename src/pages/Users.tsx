@@ -372,7 +372,7 @@ const Users = () => {
       {/* Add/Edit Modal */}
       {(isAddOpen || isEditOpen) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-xl font-bold">
@@ -400,7 +400,12 @@ const Users = () => {
                 setIsEditOpen(false);
                 setError(null);
               }}
-              initialData={selectedUser}
+              initialData={selectedUser ? {
+                email: selectedUser.email || '',
+                displayName: selectedUser.displayName,
+                role: selectedUser.role,
+                password: '' // Add empty password for the form
+              } : undefined}
               isAdd={isAddOpen}
             />
           </div>

@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Products from './pages/Products';
+import Categories from './pages/Categories';
+import Orders from './pages/Orders';
 import Tasks from './pages/Tasks';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
@@ -52,6 +54,32 @@ function App() {
                     <Sidebar />
                     <main className="flex-1">
                       <Products />
+                    </main>
+                  </div>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/categories"
+              element={
+                <PrivateRoute>
+                  <div className="flex min-h-screen bg-gray-100">
+                    <Sidebar />
+                    <main className="flex-1">
+                      <Categories />
+                    </main>
+                  </div>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <PrivateRoute>
+                  <div className="flex min-h-screen bg-gray-100">
+                    <Sidebar />
+                    <main className="flex-1">
+                      <Orders />
                     </main>
                   </div>
                 </PrivateRoute>
