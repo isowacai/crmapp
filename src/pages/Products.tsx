@@ -4,19 +4,6 @@ import { COLLECTIONS } from '../lib/firebase';
 import { Product } from '../types';
 import { Package, Plus, Eye, Pencil, Trash2, X, Tags, Check, LayoutGrid, List } from 'lucide-react';
 
-const DEFAULT_CATEGORIES = [
-  'Software',
-  'Hardware',
-  'Services',
-  'Cloud Solutions',
-  'Security',
-  'Networking',
-  'Storage',
-  'Mobile',
-  'IoT',
-  'Other'
-];
-
 interface ProductFormData {
   name: string;
   price: number;
@@ -66,7 +53,7 @@ const ProductForm = memo(({
           type="text"
           value={formData.name}
           onChange={e => handleChange('name', e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           required
         />
       </div>
@@ -78,7 +65,7 @@ const ProductForm = memo(({
           min="0"
           value={formData.price}
           onChange={e => handleChange('price', parseFloat(e.target.value) || 0)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           required
         />
       </div>
@@ -87,7 +74,7 @@ const ProductForm = memo(({
         <select
           value={formData.category}
           onChange={e => handleChange('category', e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           required
         >
           <option value="">Select a category</option>
@@ -103,7 +90,7 @@ const ProductForm = memo(({
           min="0"
           value={formData.stock}
           onChange={e => handleChange('stock', parseInt(e.target.value) || 0)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           required
         />
       </div>
@@ -113,7 +100,7 @@ const ProductForm = memo(({
           value={formData.description}
           onChange={e => handleChange('description', e.target.value)}
           rows={3}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           required
         />
       </div>
@@ -121,7 +108,7 @@ const ProductForm = memo(({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Cancel
         </button>
@@ -184,7 +171,7 @@ const CategoryForm = memo(({
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
             placeholder="New category name"
-            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           />
           <button
             type="submit"
@@ -195,7 +182,7 @@ const CategoryForm = memo(({
         </div>
       </form>
 
-      <div className="space-y-2">
+      <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
         {categories.map((category) => (
           <div
             key={category}
@@ -207,7 +194,7 @@ const CategoryForm = memo(({
                   type="text"
                   value={editedCategoryName}
                   onChange={(e) => setEditedCategoryName(e.target.value)}
-                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   autoFocus
                 />
                 <button
@@ -230,21 +217,21 @@ const CategoryForm = memo(({
               </div>
             ) : (
               <>
-                <span>{category}</span>
+                <span className="text-gray-700">{category}</span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleEdit(category)}
-                    className="text-amber-600 hover:text-amber-700"
+                    className="text-amber-600 hover:text-amber-700 p-1 rounded-lg hover:bg-amber-50"
                     title="Edit"
                   >
-                    <Pencil size={18} />
+                    <Pencil size={16} />
                   </button>
                   <button
                     onClick={() => onDeleteCategory(category)}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 p-1 rounded-lg hover:bg-red-50"
                     title="Delete"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </>
@@ -272,8 +259,8 @@ const ProductCard = memo(({
 }) => (
   <div className="card p-6 flex flex-col">
     <div className="flex items-center justify-between mb-4">
-      <div className="p-3 bg-blue-100 rounded-xl">
-        <Package className="text-blue-600" size={24} />
+      <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
+        <Package className="text-white" size={24} />
       </div>
       <div className="flex items-center gap-1">
         <button 
@@ -304,7 +291,7 @@ const ProductCard = memo(({
       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
         product.stock > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
       }`}>
-        {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
+        {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}
       </span>
     </div>
     <p className="text-gray-600 text-sm mb-4 flex-grow">{product.description}</p>
@@ -329,12 +316,21 @@ const Products = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const { data: products, loading, error, add, update, remove } = useFirestore<Product>({
     collectionName: COLLECTIONS.PRODUCTS
   });
+
+  const { data: categoryData } = useFirestore<{ name: string }>({
+    collectionName: COLLECTIONS.CATEGORIES
+  });
+
+  // Update categories when categoryData changes
+  React.useEffect(() => {
+    setCategories(categoryData.map(cat => cat.name));
+  }, [categoryData]);
 
   const handleAdd = () => {
     setIsAddOpen(true);
@@ -384,21 +380,38 @@ const Products = () => {
     }
   };
 
-  const handleAddCategory = (category: string) => {
-    if (!categories.includes(category)) {
+  const handleAddCategory = async (category: string) => {
+    try {
+      await add({ name: category });
       setCategories([...categories, category]);
+    } catch (error) {
+      console.error('Error adding category:', error);
     }
   };
 
-  const handleDeleteCategory = (categoryToDelete: string) => {
-    setCategories(categories.filter(category => category !== categoryToDelete));
+  const handleDeleteCategory = async (categoryToDelete: string) => {
+    try {
+      const categoryDoc = categoryData.find(cat => cat.name === categoryToDelete);
+      if (categoryDoc) {
+        await remove(categoryDoc.id);
+        setCategories(categories.filter(category => category !== categoryToDelete));
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
+    }
   };
 
-  const handleEditCategory = (oldCategory: string, newCategory: string) => {
-    if (!categories.includes(newCategory)) {
-      setCategories(categories.map(cat => 
-        cat === oldCategory ? newCategory : cat
-      ));
+  const handleEditCategory = async (oldCategory: string, newCategory: string) => {
+    try {
+      const categoryDoc = categoryData.find(cat => cat.name === oldCategory);
+      if (categoryDoc) {
+        await update(categoryDoc.id, { name: newCategory });
+        setCategories(categories.map(cat => 
+          cat === oldCategory ? newCategory : cat
+        ));
+      }
+    } catch (error) {
+      console.error('Error editing category:', error);
     }
   };
 
@@ -675,13 +688,13 @@ const Products = () => {
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setIsDeleteConfirmOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
               >
                 Delete
               </button>

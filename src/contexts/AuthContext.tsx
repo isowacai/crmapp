@@ -10,7 +10,7 @@ import {
   onAuthStateChanged,
   updateProfile as firebaseUpdateProfile
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User, UserRole } from '../types';
 
@@ -29,23 +29,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const convertFirebaseUser = (firebaseUser: FirebaseUser): User => ({
-  id: firebaseUser.uid,
-  email: firebaseUser.email,
-  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Unknown User',
-  role: 'customer' as UserRole,
-  lastLogin: new Date(firebaseUser.metadata.lastSignInTime || Date.now()),
-  createdAt: new Date(firebaseUser.metadata.creationTime || Date.now()),
-  active: true
-});
+const convertFirebaseUser = async (firebaseUser: FirebaseUser): Promise<User> => {
+  // Get additional user data from Firestore
+  const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+  const userData = userDoc.data();
+
+  return {
+    id: firebaseUser.uid,
+    email: firebaseUser.email,
+    displayName: userData?.displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Unknown User',
+    role: userData?.role || 'customer',
+    lastLogin: new Date(firebaseUser.metadata.lastSignInTime || Date.now()),
+    createdAt: new Date(firebaseUser.metadata.creationTime || Date.now()),
+    active: userData?.active ?? true
+  };
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser ? convertFirebaseUser(firebaseUser) : null);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = await convertFirebaseUser(firebaseUser);
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -58,6 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!userCredential.user.emailVerified) {
         throw new Error('Please verify your email address');
       }
+      const userData = await convertFirebaseUser(userCredential.user);
+      setUser(userData);
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
@@ -92,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
+      setUser(null);
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;
@@ -130,7 +144,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await firebaseUpdateProfile(auth.currentUser, { displayName });
       await setDoc(doc(db, 'users', auth.currentUser.uid), { displayName }, { merge: true });
-      setUser(prev => prev ? { ...prev, displayName } : null);
+      if (user) {
+        setUser({ ...user, displayName });
+      }
     } catch (error) {
       console.error('Update profile error:', error);
       throw error;
@@ -140,6 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserRole = async (userId: string, role: UserRole) => {
     try {
       await setDoc(doc(db, 'users', userId), { role }, { merge: true });
+      if (user && userId === user.id) {
+        setUser({ ...user, role });
+      }
     } catch (error) {
       console.error('Update user role error:', error);
       throw error;

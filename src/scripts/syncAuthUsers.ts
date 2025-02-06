@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, setDoc, collection, getDocs } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBzdQE_-COOYXUx8hHn4j0Ew1nOR1uODz8",
-  authDomain: "mycrmapp-38a5d.firebaseapp.com",
-  projectId: "mycrmapp-38a5d",
-  storageBucket: "mycrmapp-38a5d.firebasestorage.app",
-  messagingSenderId: "211469404913",
-  appId: "1:211469404913:web:4128392d6c164394f8b750"
+  apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
+  authDomain: "mycrmapp-32ca1.firebaseapp.com",
+  projectId: "mycrmapp-32ca1",
+  storageBucket: "mycrmapp-32ca1.firebasestorage.app",
+  messagingSenderId: "1019191724276",
+  appId: "1:1019191724276:web:cb11ede35271e7584df6a1"
 };
 
 // Initialize Firebase

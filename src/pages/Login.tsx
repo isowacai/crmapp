@@ -12,18 +12,23 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
   const { signIn, signUp, resetPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     try {
       if (isSignUp) {
-        await signUp(email, password);
-        setError('Please check your email to verify your account');
+        if (!name.trim()) {
+          throw new Error('Please enter your name');
+        }
+        await signUp(email, password, name);
+        setSuccess('Account created successfully! Please check your email to verify your account.');
       } else {
         await signIn(email, password);
         navigate('/');
@@ -34,13 +39,10 @@ const Login = () => {
       // Handle specific Firebase auth errors
       switch (err.code) {
         case 'auth/invalid-credential':
-          errorMessage = 'Invalid email or password';
-          break;
+        case 'auth/invalid-email':
         case 'auth/user-not-found':
-          errorMessage = 'No account found with this email';
-          break;
         case 'auth/wrong-password':
-          errorMessage = 'Incorrect password';
+          errorMessage = 'Invalid email or password';
           break;
         case 'auth/email-already-in-use':
           errorMessage = 'An account already exists with this email';
@@ -48,11 +50,11 @@ const Login = () => {
         case 'auth/weak-password':
           errorMessage = 'Password should be at least 6 characters';
           break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address';
-          break;
         case 'auth/network-request-failed':
           errorMessage = 'Network error. Please check your connection';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many failed attempts. Please try again later';
           break;
         default:
           errorMessage = err.message || 'An error occurred during authentication';
@@ -67,14 +69,26 @@ const Login = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     try {
       await resetPassword(email);
-      setError('If an account exists, you will receive a password reset email');
+      setSuccess('If an account exists, you will receive a password reset email');
       setShowResetPassword(false);
     } catch (err: any) {
-      setError(err.message || 'Failed to send reset email');
+      let errorMessage = 'Failed to send reset email';
+      
+      if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address';
+      } else if (err.code === 'auth/user-not-found') {
+        // Don't reveal if user exists for security
+        setSuccess('If an account exists, you will receive a password reset email');
+        setShowResetPassword(false);
+        return;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -124,6 +138,12 @@ const Login = () => {
             </div>
           )}
 
+          {success && (
+            <div className="mb-6 p-4 text-sm rounded-lg bg-green-50 text-green-600 border border-green-200">
+              {success}
+            </div>
+          )}
+
           {showResetPassword ? (
             <form onSubmit={handleResetPassword} className="space-y-6">
               <div>
@@ -156,7 +176,11 @@ const Login = () => {
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={() => setShowResetPassword(false)}
+                  onClick={() => {
+                    setShowResetPassword(false);
+                    setError(null);
+                    setSuccess(null);
+                  }}
                   className="text-sm text-blue-600 hover:text-blue-500"
                 >
                   Back to sign in
@@ -226,7 +250,11 @@ const Login = () => {
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setShowResetPassword(true)}
+                    onClick={() => {
+                      setShowResetPassword(true);
+                      setError(null);
+                      setSuccess(null);
+                    }}
                     className="text-sm text-blue-600 hover:text-blue-500"
                   >
                     Forgot password?
@@ -254,6 +282,7 @@ const Login = () => {
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setError(null);
+                  setSuccess(null);
                   setEmail('');
                   setPassword('');
                   setName('');

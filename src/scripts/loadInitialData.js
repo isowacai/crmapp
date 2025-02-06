@@ -2,23 +2,22 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, Timestamp, getDocs, query, doc, setDoc, connectFirestoreEmulator } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBzdQE_-COOYXUx8hHn4j0Ew1nOR1uODz8",
-  authDomain: "mycrmapp-38a5d.firebaseapp.com",
-  projectId: "mycrmapp-38a5d",
-  storageBucket: "mycrmapp-38a5d.firebasestorage.app",
-  messagingSenderId: "211469404913",
-  appId: "1:211469404913:web:4128392d6c164394f8b750"
+  apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
+  authDomain: "mycrmapp-32ca1.firebaseapp.com",
+  projectId: "mycrmapp-32ca1",
+  storageBucket: "mycrmapp-32ca1.firebasestorage.app",
+  messagingSenderId: "1019191724276",
+  appId: "1:1019191724276:web:cb11ede35271e7584df6a1"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Sample data creation function
 const createSampleData = () => ({
   users: [
     {
-      id: 'admin@example.com',  // Use email as ID for easier auth integration
+      id: 'admin@example.com',
       email: 'admin@example.com',
       displayName: 'Admin User',
       role: 'admin',
@@ -93,6 +92,64 @@ const createSampleData = () => ({
       priority: 'medium',
       createdAt: Timestamp.now()
     }
+  ],
+  categories: [
+    {
+      name: 'Software',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Hardware',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Services',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Cloud Solutions',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Security',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Networking',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Storage',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Mobile',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'IoT',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'AI/ML Solutions',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Consulting',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Support',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Training',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Other',
+      createdAt: Timestamp.now()
+    }
   ]
 });
 
@@ -145,6 +202,7 @@ const loadInitialData = async () => {
     await loadCollectionData('customers', sampleData.customers);
     await loadCollectionData('products', sampleData.products);
     await loadCollectionData('tasks', sampleData.tasks);
+    await loadCollectionData('categories', sampleData.categories);
 
     console.log('All data loaded successfully!');
     return true;

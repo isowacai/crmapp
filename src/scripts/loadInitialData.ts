@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, Timestamp, getDocs, query, doc, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBzdQE_-COOYXUx8hHn4j0Ew1nOR1uODz8",
-  authDomain: "mycrmapp-38a5d.firebaseapp.com",
-  projectId: "mycrmapp-38a5d",
-  storageBucket: "mycrmapp-38a5d.firebasestorage.app",
-  messagingSenderId: "211469404913",
-  appId: "1:211469404913:web:4128392d6c164394f8b750"
+  apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
+  authDomain: "mycrmapp-32ca1.firebaseapp.com",
+  projectId: "mycrmapp-32ca1",
+  storageBucket: "mycrmapp-32ca1.firebasestorage.app",
+  messagingSenderId: "1019191724276",
+  appId: "1:1019191724276:web:cb11ede35271e7584df6a1"
 };
 
 // Initialize Firebase
@@ -17,6 +17,7 @@ const db = getFirestore(app);
 const createSampleData = () => ({
   users: [
     {
+      id: 'admin@example.com',
       email: 'admin@example.com',
       displayName: 'Admin User',
       role: 'admin',
@@ -25,12 +26,71 @@ const createSampleData = () => ({
       active: true
     },
     {
+      id: 'manager@example.com',
       email: 'manager@example.com',
       displayName: 'Manager User',
       role: 'manager',
       createdAt: Timestamp.now(),
       lastLogin: Timestamp.now(),
       active: true
+    }
+  ],
+  categories: [
+    {
+      name: 'Software',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Hardware',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Services',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Cloud Solutions',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Security',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Networking',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Storage',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Mobile',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'IoT',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'AI/ML Solutions',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Consulting',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Support',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Training',
+      createdAt: Timestamp.now()
+    },
+    {
+      name: 'Other',
+      createdAt: Timestamp.now()
     }
   ],
   customers: [
@@ -51,15 +111,6 @@ const createSampleData = () => ({
       status: 'active',
       lastContact: '2024-03-08',
       createdAt: Timestamp.now()
-    },
-    {
-      name: 'Michael Brown',
-      email: 'michael@example.com',
-      phone: '(555) 456-7890',
-      company: 'Old Corp',
-      status: 'inactive',
-      lastContact: '2024-01-15',
-      createdAt: Timestamp.now()
     }
   ],
   products: [
@@ -68,7 +119,7 @@ const createSampleData = () => ({
       price: 299.99,
       category: 'Software',
       stock: 50,
-      description: 'Enterprise-grade software solution with advanced features',
+      description: 'Enterprise-grade software solution',
       createdAt: Timestamp.now()
     },
     {
@@ -76,22 +127,14 @@ const createSampleData = () => ({
       price: 99.99,
       category: 'Services',
       stock: 100,
-      description: '1TB cloud storage subscription with backup features',
-      createdAt: Timestamp.now()
-    },
-    {
-      name: 'Security Suite',
-      price: 199.99,
-      category: 'Software',
-      stock: 75,
-      description: 'Comprehensive security solution for businesses',
+      description: '1TB cloud storage subscription',
       createdAt: Timestamp.now()
     }
   ],
   tasks: [
     {
       title: 'Follow up with Tech Corp',
-      description: 'Schedule demo for new software package and discuss implementation timeline',
+      description: 'Schedule demo for new software',
       status: 'pending',
       dueDate: '2024-03-15',
       assignedTo: 'John Doe',
@@ -100,29 +143,25 @@ const createSampleData = () => ({
     },
     {
       title: 'Update product catalog',
-      description: 'Add new cloud services and update pricing for Q2',
+      description: 'Add new cloud services',
       status: 'in-progress',
       dueDate: '2024-03-20',
       assignedTo: 'Jane Smith',
       priority: 'medium',
-      createdAt: Timestamp.now()
-    },
-    {
-      title: 'Client presentation',
-      description: 'Prepare slides for the quarterly review meeting with Design Co',
-      status: 'completed',
-      dueDate: '2024-03-12',
-      assignedTo: 'Mike Johnson',
-      priority: 'high',
       createdAt: Timestamp.now()
     }
   ]
 });
 
 const checkIfDataExists = async (collectionName: string): Promise<boolean> => {
-  const q = query(collection(db, collectionName));
-  const snapshot = await getDocs(q);
-  return !snapshot.empty;
+  try {
+    const q = query(collection(db, collectionName));
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+  } catch (error) {
+    console.error(`Error checking ${collectionName}:`, error);
+    return false;
+  }
 };
 
 const loadCollectionData = async (collectionName: string, data: any[]) => {
@@ -136,15 +175,12 @@ const loadCollectionData = async (collectionName: string, data: any[]) => {
       return;
     }
 
-    const collectionRef = collection(db, collectionName);
-    
     for (const item of data) {
       if (collectionName === 'users') {
-        // For users, use email as the document ID
-        const docRef = doc(db, collectionName, item.email);
-        await setDoc(docRef, item);
+        // For users, use email as document ID
+        await setDoc(doc(db, collectionName, item.id), item);
       } else {
-        await addDoc(collectionRef, item);
+        await addDoc(collection(db, collectionName), item);
       }
       console.log(`Added document to ${collectionName}`);
     }
@@ -159,16 +195,14 @@ const loadCollectionData = async (collectionName: string, data: any[]) => {
 const loadInitialData = async () => {
   try {
     console.log('Starting data load...');
-    
     const sampleData = createSampleData();
     
-    // Load all collections
-    await Promise.all([
-      loadCollectionData('users', sampleData.users),
-      loadCollectionData('customers', sampleData.customers),
-      loadCollectionData('products', sampleData.products),
-      loadCollectionData('tasks', sampleData.tasks)
-    ]);
+    // Load collections sequentially to ensure proper order
+    await loadCollectionData('categories', sampleData.categories);
+    await loadCollectionData('users', sampleData.users);
+    await loadCollectionData('customers', sampleData.customers);
+    await loadCollectionData('products', sampleData.products);
+    await loadCollectionData('tasks', sampleData.tasks);
 
     console.log('All data loaded successfully!');
     process.exit(0);

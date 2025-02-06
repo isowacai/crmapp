@@ -12,8 +12,7 @@ const Sidebar = () => {
     { to: '/customers', icon: Users, label: 'Customers' },
     { to: '/products', icon: Package, label: 'Products' },
     { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
-    // Only show Users link to admins
-    ...(user?.role === 'admin' ? [{ to: '/users', icon: Shield, label: 'Users' }] : []),
+    { to: '/users', icon: Shield, label: 'Users', adminOnly: true },
   ];
 
   const handleSignOut = async () => {
@@ -24,6 +23,10 @@ const Sidebar = () => {
       console.error('Error signing out:', error);
     }
   };
+
+  const filteredLinks = links.filter(link => 
+    !link.adminOnly || user?.role === 'admin'
+  );
 
   return (
     <div className="bg-gray-900 text-white w-64 min-h-screen p-6 flex flex-col">
@@ -48,7 +51,7 @@ const Sidebar = () => {
       )}
 
       <nav className="space-y-2 flex-1">
-        {links.map((link) => {
+        {filteredLinks.map((link) => {
           const Icon = link.icon;
           const isActive = location.pathname === link.to;
           return (

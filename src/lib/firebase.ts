@@ -3,12 +3,12 @@ import { getFirestore, collection, orderBy, where, QueryConstraint } from 'fireb
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBzdQE_-COOYXUx8hHn4j0Ew1nOR1uODz8",
-  authDomain: "mycrmapp-38a5d.firebaseapp.com",
-  projectId: "mycrmapp-38a5d",
-  storageBucket: "mycrmapp-38a5d.firebasestorage.app",
-  messagingSenderId: "211469404913",
-  appId: "1:211469404913:web:4128392d6c164394f8b750"
+  apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
+  authDomain: "mycrmapp-32ca1.firebaseapp.com",
+  projectId: "mycrmapp-32ca1",
+  storageBucket: "mycrmapp-32ca1.firebasestorage.app",
+  messagingSenderId: "1019191724276",
+  appId: "1:1019191724276:web:cb11ede35271e7584df6a1"
 };
 
 // Initialize Firebase
@@ -21,20 +21,24 @@ export const COLLECTIONS = {
   USERS: 'users',
   CUSTOMERS: 'customers',
   PRODUCTS: 'products',
-  TASKS: 'tasks'
+  TASKS: 'tasks',
+  CATEGORIES: 'categories'
 } as const;
 
 // Helper functions for common queries
 export const getCollectionRef = (collectionName: string) => collection(db, collectionName);
 
 export const createQueryConstraints = (collectionName?: string): QueryConstraint[] => {
-  const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')];
+  const constraints: QueryConstraint[] = [];
   
   // Add collection-specific constraints
   if (collectionName === COLLECTIONS.USERS) {
     // No additional constraints for users collection
     return constraints;
   }
+  
+  // Add default ordering by createdAt for all other collections
+  constraints.push(orderBy('createdAt', 'desc'));
   
   return constraints;
 };
