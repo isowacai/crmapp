@@ -6,4 +6,527 @@ import { Product } from '../types';
 import { Package, Plus, Eye, Pencil, Trash2, X, LayoutGrid, List } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
-export default React
+interface ProductFormData {
+  name: string;
+  price: number;
+  category: string;
+  stock: number;
+  description: string;
+}
+
+const initialFormData: ProductFormData = {
+  name: '',
+  price: 0,
+  category: '',
+  stock: 0,
+  description: ''
+};
+
+const ProductForm = memo(({
+  onSubmit,
+  onCancel,
+  initialData = initialFormData,
+  isAdd = true,
+  categories
+}: {
+  onSubmit: (data: ProductFormData) => void;
+  onCancel: () => void;
+  initialData?: ProductFormData;
+  isAdd?: boolean;
+  categories: string[];
+}) => {
+  const [formData, setFormData] = useState<ProductFormData>(initialData);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  const handleChange = <K extends keyof ProductFormData>(field: K, value: ProductFormData[K]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Name</label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={e => handleChange('name', e.target.value)}
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Price</label>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={formData.price}
+          onChange={e => handleChange('price', parseFloat(e.target.value) || 0)}
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Category</label>
+        <select
+          value={formData.category}
+          onChange={e => handleChange('category', e.target.value)}
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          required
+        >
+          <option value="">Select a category</option>
+          {categories.map(category => (
+            <option key={category} value={category}>{category}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Stock</label>
+        <input
+          type="number"
+          min="0"
+          value={formData.stock}
+          onChange={e => handleChange('stock', parseInt(e.target.value) || 0)}
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Description</label>
+        <textarea
+          value={formData.description}
+          onChange={e => handleChange('description', e.target.value)}
+          rows={3}
+          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          required
+        />
+      </div>
+      <div className="flex justify-end space-x-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="btn-primary"
+        >
+          {isAdd ? 'Add Product' : 'Save Changes'}
+        </button>
+      </div>
+    </form>
+  );
+});
+
+ProductForm.displayName = 'ProductForm';
+
+const formatPrice = (price: number | undefined): string => {
+  if (typeof price !== 'number') return '$0.00';
+  return `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const ProductCard = memo(({
+  product,
+  onView,
+  onEdit,
+  onDelete
+}: {
+  product: Product;
+  onView: (product: Product) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
+}) => {
+  if (!product) return null;
+
+  return (
+    <div className="card p-6 flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
+          <Package className="text-white" size={24} />
+        </div>
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => onView(product)}
+            className="btn-icon text-blue-600 hover:bg-blue-50" 
+            title="View"
+          >
+            <Eye size={18} />
+          </button>
+          <button 
+            onClick={() => onEdit(product)}
+            className="btn-icon text-amber-600 hover:bg-amber-50" 
+            title="Edit"
+          >
+            <Pencil size={18} />
+          </button>
+          <button 
+            onClick={() => onDelete(product)}
+            className="btn-icon text-red-600 hover:bg-red-50" 
+            title="Delete"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">{product.name || 'Unnamed Product'}</h3>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+          (product.stock || 0) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {(product.stock || 0) > 0 ? `${product.stock} in stock` : 'Out of Stock'}
+        </span>
+      </div>
+      <p className="text-gray-600 text-sm mb-4 flex-grow">{product.description || 'No description available'}</p>
+      <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+        <span className="text-2xl font-bold text-blue-600">
+          {formatPrice(product.price)}
+        </span>
+        <div className="text-sm">
+          <span className="text-gray-500">Category: </span>
+          <span className="font-medium">{product.category || 'Uncategorized'}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+ProductCard.displayName = 'ProductCard';
+
+const Products = () => {
+  const { user } = useAuth();
+  
+  // Redirect non-admin/non-manager users
+  if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+    return <Navigate to="/" replace />;
+  }
+
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  const { data: products = [], loading, error: fetchError, add, update, remove } = useFirestore<Product>({
+    collectionName: COLLECTIONS.PRODUCTS
+  });
+
+  const { data: categoryData } = useFirestore<{ name: string }>({
+    collectionName: COLLECTIONS.CATEGORIES
+  });
+
+  React.useEffect(() => {
+    setCategories(categoryData.map(cat => cat.name));
+  }, [categoryData]);
+
+  const handleAdd = () => {
+    setIsAddOpen(true);
+  };
+
+  const handleView = (product: Product) => {
+    setSelectedProduct(product);
+    setIsViewOpen(true);
+  };
+
+  const handleEdit = (product: Product) => {
+    setSelectedProduct(product);
+    setIsEditOpen(true);
+  };
+
+  const handleDelete = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleSubmit = async (formData: ProductFormData) => {
+    try {
+      if (isAddOpen) {
+        await add(formData);
+        setIsAddOpen(false);
+      } else if (isEditOpen && selectedProduct) {
+        await update(selectedProduct.id, formData);
+        setIsEditOpen(false);
+      }
+      setSelectedProduct(null);
+    } catch (error) {
+      console.error('Error handling product:', error);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (selectedProduct) {
+      try {
+        await remove(selectedProduct.id);
+        setIsDeleteConfirmOpen(false);
+        setSelectedProduct(null);
+      } catch (error) {
+        console.error('Error deleting product:', error);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+          Error loading products: {fetchError.message}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">Products</h1>
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid size={20} />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              title="List View"
+            >
+              <List size={20} />
+            </button>
+          </div>
+        </div>
+        <button 
+          onClick={handleAdd}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Add Product
+        </button>
+      </div>
+
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onView={handleView}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="card">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Product
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Category
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Stock
+                  </th>
+                  <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {products.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-gray-600">{product.description}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        {product.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-blue-600">
+                        {formatPrice(product.price)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        product.stock > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button 
+                        onClick={() => handleView(product)}
+                        className="btn-icon text-blue-600 hover:bg-blue-50" 
+                        title="View"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleEdit(product)}
+                        className="btn-icon text-amber-600 hover:bg-amber-50" 
+                        title="Edit"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(product)}
+                        className="btn-icon text-red-600 hover:bg-red-50" 
+                        title="Delete"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
+      {(isAddOpen || isEditOpen) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">
+                {isAddOpen ? 'Add Product' : 'Edit Product'}
+              </h2>
+              <button
+                onClick={() => {
+                  setIsAddOpen(false);
+                  setIsEditOpen(false);
+                }}
+                className="btn-icon text-gray-500"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <ProductForm
+              onSubmit={handleSubmit}
+              onCancel={() => {
+                setIsAddOpen(false);
+                setIsEditOpen(false);
+              }}
+              initialData={selectedProduct || initialFormData}
+              isAdd={isAddOpen}
+              categories={categories}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* View Modal */}
+      {isViewOpen && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Product Details</h2>
+              <button
+                onClick={() => setIsViewOpen(false)}
+                className="btn-icon text-gray-500"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Name</label>
+                <p className="text-gray-900">{selectedProduct.name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Price</label>
+                <p className="text-gray-900">{formatPrice(selectedProduct.price)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Category</label>
+                <p className="text-gray-900">{selectedProduct.category}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Stock</label>
+                <p className="text-gray-900">{selectedProduct.stock}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Description</label>
+                <p className="text-gray-900">{selectedProduct.description}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteConfirmOpen && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Confirm Delete</h2>
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="btn-icon text-gray-500"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete {selectedProduct.name}? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Products;

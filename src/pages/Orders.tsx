@@ -543,7 +543,7 @@ const Orders = () => {
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {order.createdAt instanceof Date 
                       ? order.createdAt.toLocaleDateString()
-                      : new Date(order.createdAt.seconds * 1000).toLocaleDateString()}
+                      : new Date(order.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -688,7 +688,7 @@ const Orders = () => {
                   <p className="mt-1 text-gray-900">
                     {selectedOrder.createdAt instanceof Date 
                       ? selectedOrder.createdAt.toLocaleDateString()
-                      : new Date(selectedOrder.createdAt.seconds * 1000).toLocaleDateString()}
+                      : new Date(selectedOrder.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>

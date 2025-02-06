@@ -203,7 +203,7 @@ const Categories = () => {
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {category.createdAt instanceof Date 
                       ? category.createdAt.toLocaleDateString()
-                      : new Date(category.createdAt.seconds * 1000).toLocaleDateString()}
+                      : new Date(category.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">

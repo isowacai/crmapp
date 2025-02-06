@@ -22,10 +22,7 @@ interface UseFirestoreOptions {
 
 interface BaseDocument {
   id: string;
-  createdAt: {
-    seconds: number;
-    nanoseconds: number;
-  };
+  createdAt: Timestamp;
 }
 
 export function useFirestore<T extends DocumentData>({ 
