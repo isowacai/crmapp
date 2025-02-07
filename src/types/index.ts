@@ -53,7 +53,10 @@ export interface Order {
   items: OrderItem[];
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   totalAmount: number;
-  createdAt: Date;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
   updatedAt: Date;
   notes?: string;
   createdBy: string;

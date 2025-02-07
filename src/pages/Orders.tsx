@@ -6,6 +6,7 @@ import { Order, OrderItem, Product, Customer } from '../types';
 import { ShoppingBag, Plus, Eye, Pencil, Trash2, X, Package, ArrowUpDown, Search, Filter } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
+
 interface OrderFormData {
   customerId: string;
   customerName: string;
@@ -351,11 +352,19 @@ const Orders = () => {
       if (isAddOpen) {
         try {
           const orderId = await generateOrderId(orders);
-          await add({ 
-            ...orderData, 
+
+           // Create a new object with `id` for the `add` function
+          const orderToAdd = {
+            ...orderData,
             id: orderId,
-            createdAt: new Date() 
-          });
+            createdAt: new Date(),
+          };
+          // Call `add` without including `id`
+          await add(orderToAdd);
+
+          // Optionally, you can handle the `id` separately if needed
+          console.log('Order created with ID:', orderId);
+
           setIsAddOpen(false);
         } catch (error) {
           throw new Error('Failed to create order: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -543,7 +552,7 @@ const Orders = () => {
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {order.createdAt instanceof Date 
                       ? order.createdAt.toLocaleDateString()
-                      : new Date(order.createdAt).toLocaleDateString()}
+                      : new Date(order.createdAt.seconds * 1000).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -688,7 +697,7 @@ const Orders = () => {
                   <p className="mt-1 text-gray-900">
                     {selectedOrder.createdAt instanceof Date 
                       ? selectedOrder.createdAt.toLocaleDateString()
-                      : new Date(selectedOrder.createdAt).toLocaleDateString()}
+                      : new Date(selectedOrder.createdAt.seconds * 1000).toLocaleDateString()}
                   </p>
                 </div>
               </div>
