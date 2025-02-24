@@ -11,7 +11,7 @@ const FeatureFooter = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Dukaan</h2>
-              <p className="text-blue-400 text-sm">© 2024 All rights reserved</p>
+              <p className="text-blue-400 text-sm">© 2025 All rights reserved</p>
             </div>
           </div>
           <div className="flex gap-8 text-gray-400">
