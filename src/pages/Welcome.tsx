@@ -50,8 +50,8 @@ const Welcome = () => {
                 <Package className="text-blue-400" size={32} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Dukaan</h1>
-                <p className="text-blue-400 text-sm">Business Management System</p>
+                <h1 className="text-2xl font-bold text-white">Dukaanley</h1>
+                <p className="text-blue-400 text-sm">Business Management</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -168,7 +168,7 @@ const Welcome = () => {
                 <Package className="text-blue-400" size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Dukaan</h2>
+                <h2 className="text-xl font-bold text-white">Dukaanley</h2>
                 <p className="text-blue-400 text-sm">© 2025 All rights reserved</p>
               </div>
             </div>
