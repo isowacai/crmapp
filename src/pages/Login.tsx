@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Package, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(searchParams.get('signup') === 'true');
   const [error, setError] = useState<string | null>(null);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ const Login = () => {
         setSuccess('Account created successfully! Please check your email to verify your account.');
       } else {
         await signIn(email, password);
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (err: any) {
       let errorMessage = 'An error occurred';
@@ -105,7 +106,7 @@ const Login = () => {
                 <Package className="text-blue-400" size={32} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">MyBusiness CRM</h1>
+                <h1 className="text-2xl font-bold text-white">Dukaan</h1>
                 <p className="text-blue-400 text-sm">Business Management System</p>
               </div>
             </div>
