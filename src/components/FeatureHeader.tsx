@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Package, ArrowLeft } from 'lucide-react';
-import { DivideIcon as LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface FeatureHeaderProps {
   icon: LucideIcon;
