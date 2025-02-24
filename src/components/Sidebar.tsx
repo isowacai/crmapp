@@ -36,7 +36,7 @@ const Sidebar = () => {
     <div className="bg-gray-900 text-white w-64 min-h-screen p-6 flex flex-col">
       <div className="text-xl font-bold mb-10 pl-2 flex items-center gap-2 whitespace-nowrap">
         <Package className="text-blue-500 shrink-0" size={24} />
-        <span>Dukaan</span>
+        <span>Dukaanley</span>
       </div>
 
       {user && (
