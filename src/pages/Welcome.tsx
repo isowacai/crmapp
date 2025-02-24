@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Package, BarChart3, Users, ShoppingBag, CheckSquare } from 'lucide-react';
+import { Package, BarChart3, Users, ShoppingBag, CheckSquare, Home } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Welcome = () => {
@@ -51,6 +51,13 @@ const Welcome = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"
+              >
+                <Home size={20} />
+                Home
+              </button>
               <button
                 onClick={() => navigate('/login')}
                 className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
@@ -157,7 +164,7 @@ const Welcome = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Dukaan</h2>
-                <p className="text-blue-400 text-sm">© 2025 All rights reserved</p>
+                <p className="text-blue-400 text-sm">© 2024 All rights reserved</p>
               </div>
             </div>
             <div className="flex gap-8 text-gray-400">

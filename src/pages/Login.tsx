@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, Eye, EyeOff } from 'lucide-react';
+import { Package, Eye, EyeOff, Home } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
@@ -37,7 +37,6 @@ const Login = () => {
     } catch (err: any) {
       let errorMessage = 'An error occurred';
       
-      // Handle specific Firebase auth errors
       switch (err.code) {
         case 'auth/invalid-credential':
         case 'auth/invalid-email':
@@ -83,7 +82,6 @@ const Login = () => {
       if (err.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address';
       } else if (err.code === 'auth/user-not-found') {
-        // Don't reveal if user exists for security
         setSuccess('If an account exists, you will receive a password reset email');
         setShowResetPassword(false);
         return;
@@ -110,6 +108,13 @@ const Login = () => {
                 <p className="text-blue-400 text-sm">Business Management System</p>
               </div>
             </div>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"
+            >
+              <Home size={20} />
+              Home
+            </button>
           </div>
         </div>
       </div>
