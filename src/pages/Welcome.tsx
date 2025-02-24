@@ -16,22 +16,26 @@ const Welcome = () => {
     {
       icon: BarChart3,
       title: 'Advanced Analytics',
-      description: 'Get detailed insights into your business performance with real-time analytics and reporting.'
+      description: 'Get detailed insights into your business performance with real-time analytics and reporting.',
+      link: '/features/analytics'
     },
     {
       icon: Users,
       title: 'Customer Management',
-      description: 'Efficiently manage customer relationships, track interactions, and improve engagement.'
+      description: 'Efficiently manage customer relationships, track interactions, and improve engagement.',
+      link: '/features/customer-management'
     },
     {
       icon: ShoppingBag,
       title: 'Order Processing',
-      description: 'Streamline your order management process from creation to fulfillment.'
+      description: 'Streamline your order management process from creation to fulfillment.',
+      link: '/features/order-processing'
     },
     {
       icon: CheckSquare,
       title: 'Task Management',
-      description: 'Stay organized with built-in task management and team collaboration tools.'
+      description: 'Stay organized with built-in task management and team collaboration tools.',
+      link: '/features/task-management'
     }
   ];
 
@@ -116,9 +120,10 @@ const Welcome = () => {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <div
+              <button
                 key={index}
-                className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition-colors"
+                onClick={() => navigate(feature.link)}
+                className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition-colors text-left"
               >
                 <div className="p-3 bg-blue-500 bg-opacity-10 rounded-xl w-fit mb-4">
                   <Icon className="text-blue-400" size={24} />
@@ -129,8 +134,8 @@ const Welcome = () => {
                 <p className="text-gray-400">
                   {feature.description}
                 </p>
-              </div>
-            )
+              </button>
+            );
           })}
         </div>
       </div>
@@ -164,7 +169,7 @@ const Welcome = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Dukaan</h2>
-                <p className="text-blue-400 text-sm">© 2025 All rights reserved</p>
+                <p className="text-blue-400 text-sm">© 2024 All rights reserved</p>
               </div>
             </div>
             <div className="flex gap-8 text-gray-400">

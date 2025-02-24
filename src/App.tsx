@@ -10,6 +10,10 @@ import Users from './pages/Users';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Welcome from './pages/Welcome';
+import Analytics from './pages/features/Analytics';
+import CustomerManagement from './pages/features/CustomerManagement';
+import OrderProcessing from './pages/features/OrderProcessing';
+import TaskManagement from './pages/features/TaskManagement';
 import { FirestoreProvider } from './contexts/FirestoreContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { PrivateRoute } from './components/PrivateRoute';
@@ -24,6 +28,10 @@ function App() {
             <Route path="/" element={<Welcome />} />
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/features/analytics" element={<Analytics />} />
+            <Route path="/features/customer-management" element={<CustomerManagement />} />
+            <Route path="/features/order-processing" element={<OrderProcessing />} />
+            <Route path="/features/task-management" element={<TaskManagement />} />
 
             {/* Protected Routes */}
             <Route
