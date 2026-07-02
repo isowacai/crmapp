@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Package, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Package, Eye, EyeOff, Home } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(searchParams.get('signup') === 'true');
   const [error, setError] = useState<string | null>(null);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,12 +32,11 @@ const Login = () => {
         setSuccess('Account created successfully! Please check your email to verify your account.');
       } else {
         await signIn(email, password);
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (err: any) {
       let errorMessage = 'An error occurred';
       
-      // Handle specific Firebase auth errors
       switch (err.code) {
         case 'auth/invalid-credential':
         case 'auth/invalid-email':
@@ -82,7 +82,6 @@ const Login = () => {
       if (err.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address';
       } else if (err.code === 'auth/user-not-found') {
-        // Don't reveal if user exists for security
         setSuccess('If an account exists, you will receive a password reset email');
         setShowResetPassword(false);
         return;
@@ -105,10 +104,17 @@ const Login = () => {
                 <Package className="text-blue-400" size={32} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">MyBusiness CRM</h1>
+                <h1 className="text-2xl font-bold text-white">Dukaan</h1>
                 <p className="text-blue-400 text-sm">Business Management System</p>
               </div>
             </div>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"
+            >
+              <Home size={20} />
+              Home
+            </button>
           </div>
         </div>
       </div>
