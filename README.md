@@ -1,6 +1,6 @@
 # Idyle Bella Shop
 
-A modern CRM application built with React, TypeScript, and Tailwind CSS.
+This is a modern CRM application built with React, TypeScript, and Tailwind CSS.
 
 ## Features
 
