@@ -1,6 +1,10 @@
 import { Package } from 'lucide-react';
 
 const FeatureFooter = () => {
+
+  const environment = window.APP_CONFIG?.environment ?? 'UNKNOWN';
+  const buildVersion = window.APP_CONFIG?.buildVersion ?? 'UNKNOWN';
+
   return (
     <footer className="bg-gray-900 border-t border-gray-800 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -12,6 +16,9 @@ const FeatureFooter = () => {
             <div>
               <h2 className="text-xl font-bold text-white">Dukaan</h2>
               <p className="text-blue-400 text-sm">© 2025 All rights reserved</p>
+              <p className="text-gray-400 text-xs mt-1">
+                Environment: {environment} | Build: {buildVersion}
+              </p>
             </div>
           </div>
           <div className="flex gap-8 text-gray-400">
