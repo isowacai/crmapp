@@ -6,6 +6,9 @@ const Welcome = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const environment = window.APP_CONFIG?.environment ?? 'UNKNOWN';
+  const buildVersion = window.APP_CONFIG?.buildVersion ?? 'UNKNOWN';
+
   // If user is already logged in, redirect to dashboard
   if (user) {
     navigate('/dashboard');
@@ -168,8 +171,11 @@ const Welcome = () => {
                 <Package className="text-blue-400" size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Dukaanley</h2>
+                <h2 className="text-xl font-bold text-white">Dukaan</h2>
                 <p className="text-blue-400 text-sm">© 2025 All rights reserved</p>
+                <p className="text-gray-400 text-xs mt-1">
+                Environment: {environment} | Build: {buildVersion}
+                </p>
               </div>
             </div>
             <div className="flex gap-8 text-gray-400">
