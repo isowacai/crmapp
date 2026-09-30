@@ -9,11 +9,11 @@ const db = getFirestore(app);
 const syncUsers = async () => {
   try {
     console.log('Starting user synchronization...');
-    
+
     // Get all users from Firestore authentication collection
     const usersRef = collection(db, 'users');
     const snapshot = await getDocs(usersRef);
-    
+
     let updated = 0;
     let skipped = 0;
 

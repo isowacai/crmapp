@@ -1,14 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyC0Jr9IlurH1-AfStLVaDFMv81IJTh2Btw",
-  authDomain: "crmboltapp.firebaseapp.com",
-  projectId: "crmboltapp",
-  storageBucket: "crmboltapp.appspot.com",
-  messagingSenderId: "596047524575",
-  appId: "1:596047524575:web:6830f4b95a42c13523ef6a"
-};
+import { firebaseConfig } from '../../config/firebaseConfig.js';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

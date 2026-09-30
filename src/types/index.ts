@@ -23,7 +23,8 @@ export interface Task {
   description: string;
   status: 'pending' | 'in-progress' | 'completed';
   dueDate: string;
-  assignedTo: string;
+  assignedTo: string; // assignee's display name
+  assignedToId?: string; // assignee's user ID (missing on tasks created before users were selectable)
   priority: 'low' | 'medium' | 'high';
 }
 
@@ -48,6 +49,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  orderNumber?: string; // e.g. ORD-20260930-0001 (date created + daily sequence)
   customerId: string;
   customerName: string;
   items: OrderItem[];

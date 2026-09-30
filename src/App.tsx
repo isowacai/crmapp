@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
@@ -18,6 +18,20 @@ import { FirestoreProvider } from './contexts/FirestoreContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { PrivateRoute } from './components/PrivateRoute';
 
+// Shared layout for all authenticated pages
+function ProtectedLayout() {
+  return (
+    <PrivateRoute>
+      <div className="flex min-h-screen bg-gray-100">
+        <Sidebar />
+        <main className="flex-1">
+          <Outlet />
+        </main>
+      </div>
+    </PrivateRoute>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -34,110 +48,16 @@ function App() {
             <Route path="/features/task-management" element={<TaskManagement />} />
 
             {/* Protected Routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Dashboard />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/customers"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Customers />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/products"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Products />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/categories"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Categories />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Orders />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/tasks"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Tasks />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/users"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Users />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <PrivateRoute>
-                  <div className="flex min-h-screen bg-gray-100">
-                    <Sidebar />
-                    <main className="flex-1">
-                      <Profile />
-                    </main>
-                  </div>
-                </PrivateRoute>
-              }
-            />
+            <Route element={<ProtectedLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/tasks" element={<Tasks />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="/profile" element={<Profile />} />
+            </Route>
 
             {/* Catch-all route */}
             <Route path="*" element={<Navigate to="/" replace />} />

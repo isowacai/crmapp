@@ -1,15 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyC0Jr9IlurH1-AfStLVaDFMv81IJTh2Btw",
-  authDomain: "crmboltapp.firebaseapp.com",
-  projectId: "crmboltapp",
-  storageBucket: "crmboltapp.firebasestorage.app",
-  messagingSenderId: "596047524575",
-  appId: "1:596047524575:web:6830f4b95a42c13523ef6a",
-  measurementId: "G-FLW4MFYJGG"
-};
+import { firebaseConfig } from '../../config/firebaseConfig.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

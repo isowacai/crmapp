@@ -1,14 +1,6 @@
-const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, getDocs } = require('firebase/firestore');
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBzdQE_-COOYXUx8hHn4j0Ew1nOR1uODz8",
-  authDomain: "mycrmapp-38a5d.firebaseapp.com",
-  projectId: "mycrmapp-38a5d",
-  storageBucket: "mycrmapp-38a5d.firebasestorage.app",
-  messagingSenderId: "211469404913",
-  appId: "1:211469404913:web:4128392d6c164394f8b750"
-};
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { firebaseConfig } from '../../config/firebaseConfig.js';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -18,7 +10,7 @@ async function listUsers() {
   try {
     const usersRef = collection(db, 'users');
     const snapshot = await getDocs(usersRef);
-    
+
     if (snapshot.empty) {
       console.log('No users found');
       process.exit(0);
@@ -27,7 +19,7 @@ async function listUsers() {
     // Print table header
     console.log('\nUser List:');
     console.log('─'.repeat(100));
-    console.log('ID'.padEnd(25), '│', 
+    console.log('ID'.padEnd(25), '│',
                 'Name'.padEnd(20), '│',
                 'Email'.padEnd(25), '│',
                 'Role'.padEnd(10), '│',
@@ -48,7 +40,7 @@ async function listUsers() {
 
     console.log('─'.repeat(100));
     console.log(`Total users: ${snapshot.size}`);
-    
+
     process.exit(0);
   } catch (error) {
     console.error('Error listing users:', error);

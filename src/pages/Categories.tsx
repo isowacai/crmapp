@@ -75,6 +75,10 @@ const Categories = () => {
     return <Navigate to="/" replace />;
   }
 
+  return <CategoriesContent />;
+};
+
+const CategoriesContent = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);

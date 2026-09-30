@@ -2,14 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, orderBy, QueryConstraint } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
-  authDomain: "mycrmapp-32ca1.firebaseapp.com",
-  projectId: "mycrmapp-32ca1",
-  storageBucket: "mycrmapp-32ca1.firebasestorage.app",
-  messagingSenderId: "1019191724276",
-  appId: "1:1019191724276:web:cb11ede35271e7584df6a1"
-};
+// Values come from dev.properties (see vite.config.ts)
+const firebaseConfig = __FIREBASE_CONFIG__;
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

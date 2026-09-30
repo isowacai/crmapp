@@ -1,14 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDLsYwszyP4JOt4_SsaopAr9ZpTUsYB7Ek",
-  authDomain: "mycrmapp-32ca1.firebaseapp.com",
-  projectId: "mycrmapp-32ca1",
-  storageBucket: "mycrmapp-32ca1.firebasestorage.app",
-  messagingSenderId: "1019191724276",
-  appId: "1:1019191724276:web:cb11ede35271e7584df6a1"
-};
+import { firebaseConfig } from '../../config/firebaseConfig.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);

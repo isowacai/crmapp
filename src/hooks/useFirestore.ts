@@ -4,6 +4,8 @@ import {
   query,
   getDocs,
   addDoc,
+  setDoc,
+  getDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -53,10 +55,11 @@ export function useFirestore<T extends DocumentData>({
         
         if (!mounted) return;
 
+        // doc.id must come last so a stored `id` field can't mask the real document ID
         const documents = querySnapshot.docs
           .map(doc => ({
-            id: doc.id,
-            ...doc.data()
+            ...doc.data(),
+            id: doc.id
           })) as (T & BaseDocument)[];
 
         setData(limit ? documents.slice(0, limit) : documents);
@@ -79,7 +82,8 @@ export function useFirestore<T extends DocumentData>({
     };
   }, [collectionName, limit, ...queries]);
 
-  const add = async (data: Omit<T, keyof BaseDocument>) => {
+  // Pass `id` to use it as the document ID; otherwise Firestore generates one
+  const add = async (data: Omit<T, keyof BaseDocument>, id?: string) => {
     try {
       const timestamp = Timestamp.now();
       const docData = {
@@ -87,11 +91,21 @@ export function useFirestore<T extends DocumentData>({
         createdAt: timestamp
       };
 
-      const docRef = await addDoc(collection(db, collectionName), docData);
-      
+      let docId: string;
+      if (id) {
+        const docRef = doc(db, collectionName, id);
+        if ((await getDoc(docRef)).exists()) {
+          throw new Error(`A document with ID ${id} already exists`);
+        }
+        await setDoc(docRef, docData);
+        docId = id;
+      } else {
+        docId = (await addDoc(collection(db, collectionName), docData)).id;
+      }
+
       const newDoc = {
         ...docData,
-        id: docRef.id
+        id: docId
       } as T & BaseDocument;
       
       setData(prev => [newDoc, ...prev]);
