@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, CheckSquare, LogOut, User, Shield, ShoppingBag, Tags } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, ClipboardList, Gauge, Package, CheckSquare, LogOut, User, Shield, Tags } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { canManageCatalog, canManageRequests } from '../lib/roles';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -9,10 +10,10 @@ const Sidebar = () => {
   
   const links = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/customers', icon: Users, label: 'Customers' },
-    { to: '/products', icon: Package, label: 'Products', managerAccess: true },
+    { to: '/services', icon: LayoutGrid, label: 'Service Catalog' },
+    { to: '/requests', icon: ClipboardList, label: 'Service Requests' },
+    { to: '/capacity', icon: Gauge, label: 'Capacity', leadAccess: true },
     { to: '/categories', icon: Tags, label: 'Categories', managerAccess: true },
-    { to: '/orders', icon: ShoppingBag, label: 'Orders', managerAccess: true },
     { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { to: '/users', icon: Shield, label: 'Users', adminOnly: true },
   ];
@@ -28,7 +29,8 @@ const Sidebar = () => {
 
   const filteredLinks = links.filter(link => {
     if (link.adminOnly) return user?.role === 'admin';
-    if (link.managerAccess) return user?.role === 'admin' || user?.role === 'manager';
+    if (link.managerAccess) return canManageCatalog(user?.role);
+    if (link.leadAccess) return canManageRequests(user?.role);
     return true;
   });
 

@@ -13,12 +13,19 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User, UserRole } from '../types';
+import { DEFAULT_WEEKLY_CAPACITY, normalizeRole } from '../lib/roles';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName?: string, role?: UserRole) => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName?: string,
+    role?: UserRole,
+    profile?: { team?: string; weeklyCapacityHours?: number }
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -38,10 +45,12 @@ const convertFirebaseUser = async (firebaseUser: FirebaseUser): Promise<User> =>
     id: firebaseUser.uid,
     email: firebaseUser.email,
     displayName: userData?.displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Unknown User',
-    role: userData?.role || 'customer',
+    role: normalizeRole(userData?.role),
     lastLogin: new Date(firebaseUser.metadata.lastSignInTime || Date.now()),
     createdAt: new Date(firebaseUser.metadata.creationTime || Date.now()),
-    active: userData?.active ?? true
+    active: userData?.active ?? true,
+    team: userData?.team || '',
+    weeklyCapacityHours: userData?.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY
   };
 };
 
@@ -77,7 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, displayName?: string, role: UserRole = 'customer') => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName?: string,
+    role: UserRole = 'staff',
+    profile: { team?: string; weeklyCapacityHours?: number } = {}
+  ) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -90,6 +105,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         displayName: displayName || email.split('@')[0],
         role,
+        team: profile.team || '',
+        weeklyCapacityHours: profile.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY,
         createdAt: new Date(),
         lastLogin: new Date(),
         active: true

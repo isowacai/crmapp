@@ -13,10 +13,9 @@ export const auth = getAuth(app);
 // Collection references
 export const COLLECTIONS = {
   USERS: 'users',
-  CUSTOMERS: 'customers',
-  PRODUCTS: 'products',
   CATEGORIES: 'categories',
-  ORDERS: 'orders',
+  SERVICES: 'services',
+  REQUESTS: 'requests',
   TASKS: 'tasks'
 } as const;
 

@@ -5,30 +5,37 @@ import { User, UserRole } from '../types';
 import { Users as UsersIcon, UserPlus, Eye, Pencil, Trash2, X, Shield, Search, Filter } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { COLLECTIONS } from '../lib/firebase';
+import { DEFAULT_WEEKLY_CAPACITY, normalizeRole, ROLE_LABELS } from '../lib/roles';
 
 interface UserFormData {
   email: string;
   password: string;
   displayName: string;
   role: UserRole;
+  team: string;
+  weeklyCapacityHours: number;
 }
 
 const UserForm = memo(({
   onSubmit,
   onCancel,
   initialData,
-  isAdd = true
+  isAdd = true,
+  teams
 }: {
   onSubmit: (data: UserFormData) => void;
   onCancel: () => void;
   initialData?: Partial<UserFormData>;
   isAdd?: boolean;
+  teams: string[];
 }) => {
   const [formData, setFormData] = useState<UserFormData>({
     email: initialData?.email || '',
     password: '',
     displayName: initialData?.displayName || '',
-    role: initialData?.role || 'customer'
+    role: initialData?.role || 'staff',
+    team: initialData?.team || '',
+    weeklyCapacityHours: initialData?.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,10 +90,40 @@ const UserForm = memo(({
           onChange={(e) => handleChange('role', e.target.value as UserRole)}
           className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         >
-          <option value="customer">Customer</option>
+          <option value="staff">Staff</option>
+          <option value="lead">Lead</option>
           <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
+        <p className="mt-1 text-xs text-gray-500">Leads and managers can triage and assign requests; admins also manage the catalog and users.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Team</label>
+          <input
+            type="text"
+            value={formData.team}
+            onChange={(e) => handleChange('team', e.target.value)}
+            list="user-teams"
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          />
+          <datalist id="user-teams">
+            {teams.map(t => <option key={t} value={t} />)}
+          </datalist>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Capacity (hours/week)</label>
+          <input
+            type="number"
+            min={0}
+            max={80}
+            step={0.5}
+            value={formData.weeklyCapacityHours}
+            onChange={(e) => handleChange('weeklyCapacityHours', Number(e.target.value))}
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            required
+          />
+        </div>
       </div>
       <div className="flex justify-end gap-3 pt-4">
         <button
@@ -138,6 +175,8 @@ const Users = () => {
     collectionName: COLLECTIONS.USERS
   });
 
+  const teams = [...new Set(users.map(u => u.team).filter(Boolean) as string[])].sort();
+
   // Redirect non-admin users
   if (!currentUser || currentUser.role !== 'admin') {
     return <Navigate to="/" replace />;
@@ -146,7 +185,7 @@ const Users = () => {
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    const matchesRole = roleFilter === 'all' || normalizeRole(user.role) === roleFilter;
     return matchesSearch && matchesRole;
   });
 
@@ -174,13 +213,18 @@ const Users = () => {
       setError(null);
       
       if (isAddOpen) {
-        await signUp(formData.email, formData.password, formData.displayName, formData.role);
+        await signUp(formData.email, formData.password, formData.displayName, formData.role, {
+          team: formData.team,
+          weeklyCapacityHours: formData.weeklyCapacityHours
+        });
         setIsAddOpen(false);
       } else if (isEditOpen && selectedUser) {
         await updateUserRole(selectedUser.id, formData.role);
         await update(selectedUser.id, {
           displayName: formData.displayName,
-          role: formData.role
+          role: formData.role,
+          team: formData.team,
+          weeklyCapacityHours: formData.weeklyCapacityHours
         });
         setIsEditOpen(false);
       }
@@ -276,7 +320,8 @@ const Users = () => {
                 <option value="all">All Roles</option>
                 <option value="admin">Admin</option>
                 <option value="manager">Manager</option>
-                <option value="customer">Customer</option>
+                <option value="lead">Lead</option>
+                <option value="staff">Staff</option>
               </select>
             </div>
           </div>
@@ -291,6 +336,9 @@ const Users = () => {
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Role
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Team
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -321,8 +369,12 @@ const Users = () => {
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       <Shield size={12} />
-                      {user.role}
+                      {ROLE_LABELS[normalizeRole(user.role)]}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    <div>{user.team || '—'}</div>
+                    <div className="text-xs text-gray-500">{user.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY}h / week</div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -403,10 +455,13 @@ const Users = () => {
               initialData={selectedUser ? {
                 email: selectedUser.email || '',
                 displayName: selectedUser.displayName,
-                role: selectedUser.role,
+                role: normalizeRole(selectedUser.role),
+                team: selectedUser.team || '',
+                weeklyCapacityHours: selectedUser.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY,
                 password: '' // Add empty password for the form
               } : undefined}
               isAdd={isAddOpen}
+              teams={teams}
             />
           </div>
         </div>
@@ -450,8 +505,16 @@ const Users = () => {
                     : 'bg-gray-100 text-gray-800'
                 }`}>
                   <Shield size={14} />
-                  {selectedUser.role}
+                  {ROLE_LABELS[normalizeRole(selectedUser.role)]}
                 </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500">Team</label>
+                <p className="mt-1 text-lg font-medium">{selectedUser.team || '—'}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500">Capacity</label>
+                <p className="mt-1 text-lg font-medium">{selectedUser.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY} hours / week</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Status</label>

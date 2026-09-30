@@ -1,16 +1,27 @@
-# My Shop CRM
+# Demand Management
 
-This is a modern CRM application built with React, TypeScript, and Tailwind CSS.
+An internal demand-management app: staff raise service requests from a predefined catalog, leads and
+managers triage and assign them to people, and dashboards show demand, delivery, and team capacity.
+Built with React, TypeScript, Tailwind CSS, and Firebase.
 
 ## Features
 
-- Dashboard with key metrics and visualizations
-- Customer management
-- Product catalog
-- Task management
-- Beautiful UI with Tailwind CSS
-- Responsive design
-- Data visualization with custom charts
+- **Service catalog**: predefined services with a delivering team, standard effort, and target turnaround
+- **Service requests**: numbered `REQ-YYYYMMDD-NNNN`, with impact × urgency priority (P1–P4) and a full history
+- **Triage and assignment**: leads and managers assign requests with an estimate and planned dates,
+  seeing each person's existing load and a warning if they'd go over capacity
+- **Capacity**: per-person weekly capacity, planned vs. logged hours, and team consumption reports
+- **Dashboards**: backlog, demand trend, most requested services, on-time delivery, lead time, utilization
+
+## Roles
+
+| Role | Can |
+|---|---|
+| Staff | Raise requests, track their own, and work on requests assigned to them |
+| Lead / Manager | Everything staff can, plus triage, assign, re-plan, and view capacity; managers also edit the catalog |
+| Admin | Everything, plus manage users (role, team, weekly capacity) |
+
+Users stored with the old `customer` role are treated as Staff.
 
 ## Getting Started
 
@@ -34,8 +45,7 @@ These run against the same Firebase project as the app:
 npm run list-users            # print all users in the `users` collection
 npm run set-admin <userId>    # give a user the admin role
 npm run sync-users            # fill in missing fields on user documents
-npm run load-data             # load sample data
-npm run number-orders         # preview order numbers for older orders (add `-- --apply` to save)
+npm run load-services         # add a starter service catalog (skips anything that already exists)
 ```
 
 
