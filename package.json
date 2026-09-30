@@ -11,10 +11,10 @@
     "set-admin": "node src/scripts/setAdmin.js",
     "list-users": "node src/scripts/listUsers.js",
     "sync-users": "node src/scripts/syncAuthUsers.js",
-    "load-data": "node src/scripts/loadInitialData.js"
+    "load-data": "node src/scripts/loadInitialData.js",
+    "number-orders": "node src/scripts/addOrderNumbers.js"
   },
   "dependencies": {
-    "crypto-js": "^4.2.0",
     "firebase": "^10.8.0",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
@@ -24,7 +24,6 @@
   "devDependencies": {
     "@eslint/js": "^9.9.1",
     "@tailwindcss/forms": "^0.5.7",
-    "@types/crypto-js": "^4.2.2",
     "@types/node": "^20.11.24",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",

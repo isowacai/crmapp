@@ -206,6 +206,10 @@ const Products = () => {
     return <Navigate to="/" replace />;
   }
 
+  return <ProductsContent />;
+};
+
+const ProductsContent = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);

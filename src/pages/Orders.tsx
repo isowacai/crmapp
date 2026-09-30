@@ -2,7 +2,7 @@ import React, { useState, memo } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
-import { Order, OrderItem, Product, Customer } from '../types';
+import { Order, OrderItem, Product, Customer, User } from '../types';
 import { ShoppingBag, Plus, Eye, Pencil, Trash2, X, Package, ArrowUpDown, Search, Filter } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
@@ -23,45 +23,28 @@ const initialFormData: OrderFormData = {
   notes: ''
 };
 
-const getLastOrderSequence = async (orders: Order[], datePrefix: string): Promise<number> => {
-  try {
-    // Filter orders for the given date prefix
-    const dayOrders = orders.filter(order => order.id.startsWith(datePrefix));
-    
-    if (dayOrders.length === 0) return 1; // Start with 1 to get 0001
+const ORDER_NUMBER_PREFIX = 'ORD';
 
-    // Extract sequence numbers and find the highest
-    const sequences = dayOrders.map(order => {
-      const sequence = parseInt(order.id.split('-')[1]);
-      return isNaN(sequence) ? 0 : sequence;
-    });
+// Human-readable order number; older orders without one fall back to the document ID
+const getOrderNumber =(order: Order): string => order.orderNumber || order.id;
 
-    return Math.max(...sequences) + 1; // Return next sequence number
-  } catch (error) {
-    console.error('Error getting last order sequence:', error);
-    throw new Error('Failed to generate order sequence');
-  }
-};
+// Next order number for today: ORD-YYYYMMDD-NNNN, where NNNN is the day's sequence
+const generateOrderNumber = (orders: Order[]): string => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const datePart = `${year}${month}${day}`;
 
-const generateOrderId = async (orders: Order[]): Promise<string> => {
-  try {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const datePrefix = `${year}${month}${day}`;
-    
-    // Get the next sequence number for today
-    const nextSequence = await getLastOrderSequence(orders, datePrefix);
-    
-    // Pad sequence with zeros to always be 4 digits
-    const sequence = String(nextSequence).padStart(4, '0');
-    
-    return `${datePrefix}-${sequence}`;
-  } catch (error) {
-    console.error('Error generating order ID:', error);
-    throw new Error('Failed to generate order ID');
-  }
+  // Also match the earlier unprefixed format (YYYYMMDD-NNNN) so numbers aren't reused
+  const sameDay = new RegExp(`^(?:${ORDER_NUMBER_PREFIX}-)?${datePart}-(\\d+)$`);
+  const lastSequence = orders.reduce((max, order) => {
+    const match = getOrderNumber(order).match(sameDay);
+    return match ? Math.max(max, parseInt(match[1], 10)) : max;
+  }, 0);
+
+  const sequence = String(lastSequence + 1).padStart(4, '0');
+  return `${ORDER_NUMBER_PREFIX}-${datePart}-${sequence}`;
 };
 
 const OrderForm = memo(({
@@ -261,6 +244,10 @@ const Orders = () => {
     return <Navigate to="/" replace />;
   }
 
+  return <OrdersContent user={user} />;
+};
+
+const OrdersContent = ({ user }: { user: User }) => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -287,7 +274,7 @@ const Orders = () => {
   // Filter orders based on search term and status
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getOrderNumber(order).toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
@@ -342,28 +329,21 @@ const Orders = () => {
     try {
       setError(null);
       
+      // Only the editable fields; the form's initialData may carry the full order (id, createdAt, ...)
       const orderData = {
-        ...formData,
-        totalAmount: formData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-        createdBy: user.id,
-        updatedAt: new Date()
+        customerId: formData.customerId,
+        customerName: formData.customerName,
+        items: formData.items,
+        status: formData.status,
+        notes: formData.notes ?? '',
+        totalAmount: formData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
       };
 
       if (isAddOpen) {
         try {
-          const orderId = await generateOrderId(orders);
-
-           // Create a new object with `id` for the `add` function
-          const orderToAdd = {
-            ...orderData,
-            id: orderId,
-            createdAt: new Date(),
-          };
-          // Call `add` without including `id`
-          await add(orderToAdd);
-
-          // Optionally, you can handle the `id` separately if needed
-          console.log('Order created with ID:', orderId);
+          // The order number (e.g. ORD-20260930-0001) is stored and also used as the document ID
+          const orderNumber = generateOrderNumber(orders);
+          await add({ ...orderData, orderNumber, createdBy: user.id, updatedAt: new Date() }, orderNumber);
 
           setIsAddOpen(false);
         } catch (error) {
@@ -478,7 +458,7 @@ const Orders = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order ID
+                  Order No.
                 </th>
                 <th className="px-6 py-4 text-left">
                   <button
@@ -525,7 +505,7 @@ const Orders = () => {
               {sortedOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="text-sm font-mono text-gray-600">#{order.id}</div>
+                    <div className="text-sm font-mono text-gray-600">{getOrderNumber(order)}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-medium">{order.customerName}</div>
@@ -628,7 +608,7 @@ const Orders = () => {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-xl font-bold">Order Details</h2>
-                <p className="text-sm text-gray-500">Order #{selectedOrder.id}</p>
+                <p className="text-sm text-gray-500">Order {getOrderNumber(selectedOrder)}</p>
               </div>
               <button
                 onClick={() => {

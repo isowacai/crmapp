@@ -1,7 +1,7 @@
 import React, { useState, memo } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { COLLECTIONS } from '../lib/firebase';
-import { Task } from '../types';
+import { Task, User as AppUser } from '../types';
 import { Calendar, User, Plus, Eye, Pencil, Trash2, X, LayoutGrid, List } from 'lucide-react';
 
 interface TaskFormData {
@@ -10,6 +10,7 @@ interface TaskFormData {
   status: 'pending' | 'in-progress' | 'completed';
   dueDate: string;
   assignedTo: string;
+  assignedToId?: string;
   priority: 'low' | 'medium' | 'high';
 }
 
@@ -19,21 +20,41 @@ const initialFormData: TaskFormData = {
   status: 'pending',
   dueDate: new Date().toISOString().split('T')[0],
   assignedTo: '',
+  assignedToId: '',
   priority: 'medium'
 };
+
+// Value used in the assignee dropdown for a legacy task whose assignee was typed as free text
+const LEGACY_ASSIGNEE = '__legacy__';
 
 const TaskForm = memo(({
   onSubmit,
   onCancel,
   initialData = initialFormData,
-  isAdd = true
+  isAdd = true,
+  users
 }: {
   onSubmit: (data: TaskFormData) => void;
   onCancel: () => void;
   initialData?: TaskFormData;
   isAdd?: boolean;
+  users: AppUser[];
 }) => {
   const [formData, setFormData] = useState<TaskFormData>(initialData);
+
+  // Offer active users, plus the current assignee even if they've since been deactivated
+  const assignableUsers = users.filter(u => u.active !== false || u.id === formData.assignedToId);
+  const hasLegacyAssignee = !formData.assignedToId && !!formData.assignedTo;
+
+  const handleAssigneeChange = (userId: string) => {
+    if (userId === LEGACY_ASSIGNEE) return;
+    const assignee = users.find(u => u.id === userId);
+    setFormData(prev => ({
+      ...prev,
+      assignedToId: userId,
+      assignedTo: assignee?.displayName || assignee?.email || ''
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,13 +111,22 @@ const TaskForm = memo(({
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Assigned To</label>
-        <input
-          type="text"
-          value={formData.assignedTo}
-          onChange={(e) => handleChange('assignedTo', e.target.value)}
+        <select
+          value={hasLegacyAssignee ? LEGACY_ASSIGNEE : formData.assignedToId || ''}
+          onChange={(e) => handleAssigneeChange(e.target.value)}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           required
-        />
+        >
+          <option value="">Select a user</option>
+          {hasLegacyAssignee && (
+            <option value={LEGACY_ASSIGNEE}>{formData.assignedTo} (not a registered user)</option>
+          )}
+          {assignableUsers.map(u => (
+            <option key={u.id} value={u.id}>
+              {u.displayName || u.email}{u.email && u.displayName ? ` (${u.email})` : ''}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Priority</label>
@@ -217,6 +247,10 @@ const Tasks = () => {
     collectionName: COLLECTIONS.TASKS
   });
 
+  const { data: users } = useFirestore<AppUser>({
+    collectionName: COLLECTIONS.USERS
+  });
+
   const handleAdd = () => {
     setIsAddOpen(true);
   };
@@ -237,12 +271,23 @@ const Tasks = () => {
   };
 
   const handleSubmit = async (formData: TaskFormData) => {
+    // Only the editable fields; the form's initialData may carry the full task (id, createdAt, ...)
+    const taskData = {
+      title: formData.title,
+      description: formData.description,
+      status: formData.status,
+      dueDate: formData.dueDate,
+      assignedTo: formData.assignedTo,
+      assignedToId: formData.assignedToId ?? '',
+      priority: formData.priority
+    };
+
     try {
       if (isAddOpen) {
-        await add(formData);
+        await add(taskData);
         setIsAddOpen(false);
       } else if (isEditOpen && selectedTask) {
-        await update(selectedTask.id, formData);
+        await update(selectedTask.id, taskData);
         setIsEditOpen(false);
       }
       setSelectedTask(null);
@@ -477,6 +522,7 @@ const Tasks = () => {
               }}
               initialData={selectedTask || initialFormData}
               isAdd={isAddOpen}
+              users={users}
             />
           </div>
         </div>
