@@ -33,7 +33,7 @@ async function listUsers() {
         doc.id.padEnd(25), '│',
         (user.displayName || 'N/A').padEnd(20), '│',
         (user.email || 'N/A').padEnd(25), '│',
-        (user.role || 'customer').padEnd(10), '│',
+        (user.role || 'staff').padEnd(10), '│',
         user.active ? 'Active' : 'Inactive'
       );
     });

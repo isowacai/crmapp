@@ -29,7 +29,7 @@ const syncUsers = async () => {
         lastLogin: userData.lastLogin || new Date(),
         createdAt: userData.createdAt || new Date(),
         active: userData.active ?? true,
-        role: userData.role || 'customer',
+        role: userData.role === 'customer' || !userData.role ? 'staff' : userData.role,
         updatedAt: new Date()
       };
 

@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
-import Customers from './pages/Customers';
-import Products from './pages/Products';
+import ServiceCatalog from './pages/ServiceCatalog';
+import Requests from './pages/Requests';
+import Capacity from './pages/Capacity';
 import Categories from './pages/Categories';
-import Orders from './pages/Orders';
 import Tasks from './pages/Tasks';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
@@ -50,10 +50,10 @@ function App() {
             {/* Protected Routes */}
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/products" element={<Products />} />
+              <Route path="/services" element={<ServiceCatalog />} />
+              <Route path="/requests" element={<Requests />} />
+              <Route path="/capacity" element={<Capacity />} />
               <Route path="/categories" element={<Categories />} />
-              <Route path="/orders" element={<Orders />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/users" element={<Users />} />
               <Route path="/profile" element={<Profile />} />

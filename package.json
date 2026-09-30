@@ -11,8 +11,7 @@
     "set-admin": "node src/scripts/setAdmin.js",
     "list-users": "node src/scripts/listUsers.js",
     "sync-users": "node src/scripts/syncAuthUsers.js",
-    "load-data": "node src/scripts/loadInitialData.js",
-    "number-orders": "node src/scripts/addOrderNumbers.js"
+    "load-services": "node src/scripts/loadServiceCatalog.js"
   },
   "dependencies": {
     "firebase": "^10.8.0",
