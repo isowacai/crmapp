@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Play, Pause, CheckCircle2, UserPlus, XCircle, Ban, Clock, MessageSquare, RotateCcw } from 'lucide-react';
 import { RequestHistoryEntry, RequestStatus, Service, ServiceRequest, User } from '../../types';
 import { canManageRequests } from '../../lib/roles';
-import { computePriority, formatHours, isOverdue, PRIORITY_STYLES } from '../../lib/demand';
-import { StatusBadge } from '../RequestBadges';
+import { computePriority, formatHours, isOverdue } from '../../lib/demand';
+import { PriorityBadge, StatusBadge } from '../RequestBadges';
 import AssignForm, { AssignData } from './AssignForm';
 
 export type RequestChange = (
@@ -181,7 +181,7 @@ const RequestDetails = ({
 
   const actions: React.ReactNode[] = [];
   if (s === 'submitted' && isManager) {
-    actions.push(<ActionButton key="assign" icon={UserPlus} label="Assign" tone="primary" onClick={() => setMode('assign')} />);
+    actions.push(<ActionButton key="assign" icon={UserPlus} label="Triage & assign" tone="primary" onClick={() => setMode('assign')} />);
     actions.push(<ActionButton key="reject" icon={XCircle} label="Reject" tone="danger" onClick={() => setMode('reject')} />);
   }
   if (s === 'assigned' && canWork) {
@@ -219,9 +219,7 @@ const RequestDetails = ({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={s} />
-        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${PRIORITY_STYLES[request.priority].badge}`}>
-          {PRIORITY_STYLES[request.priority].label}
-        </span>
+        <PriorityBadge priority={request.priority} long />
         {isOverdue(request) && <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-600 text-white">Overdue</span>}
       </div>
 
@@ -230,13 +228,12 @@ const RequestDetails = ({
         <Field label="Category">{request.category}</Field>
         <Field label="Requester">{request.requesterName}{request.requesterTeam ? ` · ${request.requesterTeam}` : ''}</Field>
         <Field label="Needed by">{request.neededBy}</Field>
-        <Field label="Impact / urgency">{request.impact} / {request.urgency}</Field>
+        <Field label="Impact / urgency">{request.impact ? `${request.impact} / ${request.urgency}` : 'Set at triage'}</Field>
         <Field label="Assignee">{request.assigneeName}{request.assigneeTeam ? ` · ${request.assigneeTeam}` : ''}</Field>
         <Field label="Planned">{request.startDate && `${request.startDate} → ${request.dueDate}`}</Field>
         <Field label="Effort (logged / est.)">
           {request.estimatedHours ? `${formatHours(request.loggedHours)} / ${formatHours(request.estimatedHours)}` : formatHours(request.loggedHours)}
         </Field>
-        <Field label="Service turnaround">{service ? `${service.slaDays} working days` : ''}</Field>
       </dl>
 
       <div>

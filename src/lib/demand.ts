@@ -22,6 +22,9 @@ export const PRIORITY_STYLES: Record<Priority, { label: string; badge: string; c
 
 export const PRIORITIES: Priority[] = ['P1', 'P2', 'P3', 'P4'];
 
+// Sort order: not-yet-prioritized (awaiting triage) first, then P1 → P4
+export const priorityRank = (p: Priority | '') => (p ? PRIORITIES.indexOf(p) + 1 : 0);
+
 // ---------- Status ----------
 
 export const STATUS_STYLES: Record<RequestStatus, { label: string; badge: string; color: string }> = {
@@ -136,6 +139,9 @@ export const allocateByWeek = (r: Pick<ServiceRequest, 'estimatedHours' | 'start
   return byWeek;
 };
 
+// Team shown for people who have no team set
+export const UNASSIGNED_TEAM = 'Unassigned';
+
 export interface CapacityRow {
   userId: string;
   name: string;
@@ -152,7 +158,7 @@ export const buildCapacity = (users: User[], requests: ServiceRequest[], weeks: 
     rows.set(u.id, {
       userId: u.id,
       name: u.displayName || u.email || 'Unknown',
-      team: u.team || 'Unassigned',
+      team: u.team || UNASSIGNED_TEAM,
       weeklyCapacity: u.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY,
       allocated: Object.fromEntries(weeks.map(w => [w, 0]))
     });
@@ -184,6 +190,54 @@ export const loggedByUserWeek = (requests: ServiceRequest[]): Map<string, Map<st
   }
   return result;
 };
+
+export interface TeamSummary {
+  team: string;
+  members: number;
+  capacity: Record<string, number>; // week → combined capacity hours
+  planned: Record<string, number>; // week → combined planned hours
+  logged: Record<string, number>; // week → combined logged hours
+}
+
+// Per-team weekly totals from per-person capacity rows and logged hours
+export const summarizeTeams = (
+  rows: CapacityRow[],
+  weeks: string[],
+  logged: Map<string, Map<string, number>>
+): TeamSummary[] =>
+  [...new Set(rows.map(r => r.team))].sort().map(team => {
+    const members = rows.filter(r => r.team === team);
+    const perWeek = (fn: (r: CapacityRow, w: string) => number) =>
+      Object.fromEntries(weeks.map(w => [w, members.reduce((s, m) => s + fn(m, w), 0)]));
+    return {
+      team,
+      members: members.length,
+      capacity: perWeek(m => m.weeklyCapacity),
+      planned: perWeek((m, w) => m.allocated[w]),
+      logged: perWeek((m, w) => logged.get(m.userId)?.get(w) || 0)
+    };
+  });
+
+// Open first, then by priority (unset first), then earliest due date
+export const compareByUrgency = (a: ServiceRequest, b: ServiceRequest) =>
+  Number(isOpen(b)) - Number(isOpen(a)) ||
+  priorityRank(a.priority) - priorityRank(b.priority) ||
+  (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
+
+// Planned hours of a request that fall within the given weeks (only while it counts against capacity)
+export const plannedInWeeks = (r: ServiceRequest, weeks: Set<string>): number => {
+  if (!LOAD_STATUSES.includes(r.status) || !r.assigneeId) return 0;
+  let total = 0;
+  for (const [week, hours] of allocateByWeek(r)) if (weeks.has(week)) total += hours;
+  return total;
+};
+
+// Hours logged on a request, optionally only within the given weeks and/or by the given people
+export const loggedOn = (r: ServiceRequest, opts: { weeks?: Set<string>; byIds?: Set<string> } = {}): number =>
+  (r.history || [])
+    .filter(h => h.hours && (!opts.byIds || opts.byIds.has(h.byId)))
+    .filter(h => !opts.weeks || opts.weeks.has(toDateKey(startOfWeek(new Date(h.at)))))
+    .reduce((sum, h) => sum + (h.hours || 0), 0);
 
 export const utilization = (allocated: number, capacity: number) =>
   capacity > 0 ? Math.round((allocated / capacity) * 100) : allocated > 0 ? 999 : 0;
