@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Impact, Service, ServiceRequest, Urgency, User } from '../../types';
 import {
-  addWorkingDays,
   allocateByWeek,
   buildCapacity,
   computePriority,
@@ -26,8 +25,23 @@ export interface AssignData {
   note: string;
 }
 
+// Impact and urgency start blank on a new request and must be chosen during triage
+type AssignFormState = Omit<AssignData, 'impact' | 'urgency'> & { impact: Impact | ''; urgency: Urgency | '' };
+
 const inputClass =
   'mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500';
+
+const IMPACT_HELP: Record<Impact, string> = {
+  high: 'Many people, a whole team, or a critical process is affected',
+  medium: 'A few people or a non-critical process is affected',
+  low: 'One person, or a nice-to-have improvement'
+};
+
+const URGENCY_HELP: Record<Urgency, string> = {
+  high: 'Work is blocked or a hard deadline is imminent',
+  medium: 'Needed soon; a workaround exists',
+  low: 'No time pressure'
+};
 
 const AssignForm = ({
   request,
@@ -46,12 +60,12 @@ const AssignForm = ({
 }) => {
   const today = toDateKey(new Date());
   const defaultStart = request.startDate || today;
-  const defaultDue =
-    request.dueDate || toDateKey(addWorkingDays(parseDateKey(defaultStart), Math.max((service?.slaDays ?? 5) - 1, 0)));
+  // Default the due date to the requester's needed-by date when it's usable
+  const defaultDue = request.dueDate || (request.neededBy && request.neededBy >= defaultStart ? request.neededBy : '');
 
-  const [form, setForm] = useState<AssignData>({
+  const [form, setForm] = useState<AssignFormState>({
     assigneeId: request.assigneeId,
-    estimatedHours: request.estimatedHours || service?.standardEffortHours || 8,
+    estimatedHours: request.estimatedHours,
     startDate: defaultStart,
     dueDate: defaultDue,
     impact: request.impact,
@@ -59,7 +73,7 @@ const AssignForm = ({
     note: ''
   });
   const [submitting, setSubmitting] = useState(false);
-  const set = <K extends keyof AssignData>(key: K, value: AssignData[K]) => setForm(prev => ({ ...prev, [key]: value }));
+  const set = <K extends keyof AssignFormState>(key: K, value: AssignFormState[K]) => setForm(prev => ({ ...prev, [key]: value }));
 
   // Weeks covered by the planned dates
   const weeks = useMemo(() => {
@@ -92,13 +106,14 @@ const AssignForm = ({
     ? weeks.filter(w => selected.allocated[w] + (thisLoad.get(w) || 0) > selected.weeklyCapacity)
     : [];
 
-  const priority = computePriority(form.impact, form.urgency);
+  const priority = form.impact && form.urgency ? computePriority(form.impact, form.urgency) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.impact || !form.urgency) return; // enforced by the required selects
     setSubmitting(true);
     try {
-      await onSubmit(form);
+      await onSubmit({ ...form, impact: form.impact, urgency: form.urgency });
     } finally {
       setSubmitting(false);
     }
@@ -106,6 +121,42 @@ const AssignForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800">1. Priority</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Impact</label>
+            <select className={inputClass} value={form.impact} onChange={e => set('impact', e.target.value as Impact)} required>
+              <option value="">Select…</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            {form.impact && <p className="mt-1 text-xs text-gray-500">{IMPACT_HELP[form.impact]}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Urgency</label>
+            <select className={inputClass} value={form.urgency} onChange={e => set('urgency', e.target.value as Urgency)} required>
+              <option value="">Select…</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            {form.urgency && <p className="mt-1 text-xs text-gray-500">{URGENCY_HELP[form.urgency]}</p>}
+          </div>
+          <div className="sm:pt-7">
+            {priority ? (
+              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${PRIORITY_STYLES[priority].badge}`}>
+                {PRIORITY_STYLES[priority].label}
+              </span>
+            ) : (
+              <span className="text-xs text-gray-500">Priority is calculated from impact × urgency</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h3 className="text-sm font-semibold text-gray-800 pt-2">2. Plan and assign</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Planned start</label>
@@ -133,7 +184,7 @@ const AssignForm = ({
           min={0.5}
           step={0.5}
           className={inputClass}
-          value={form.estimatedHours}
+          value={form.estimatedHours || ''}
           onChange={e => set('estimatedHours', Number(e.target.value))}
           required
         />
@@ -189,29 +240,6 @@ const AssignForm = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Impact</label>
-          <select className={inputClass} value={form.impact} onChange={e => set('impact', e.target.value as Impact)}>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Urgency</label>
-          <select className={inputClass} value={form.urgency} onChange={e => set('urgency', e.target.value as Urgency)}>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-        <div className="pb-2">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${PRIORITY_STYLES[priority].badge}`}>
-            {PRIORITY_STYLES[priority].label}
-          </span>
-        </div>
-      </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Note (optional)</label>
         <input className={inputClass} value={form.note} onChange={e => set('note', e.target.value)} placeholder="Shown in the request history" />
@@ -221,7 +249,7 @@ const AssignForm = ({
           Cancel
         </button>
         <button type="submit" className="btn-primary disabled:opacity-60" disabled={submitting}>
-          {submitting ? 'Saving…' : request.assigneeId ? 'Save assignment' : 'Assign'}
+          {submitting ? 'Saving…' : request.assigneeId ? 'Save changes' : 'Set priority & assign'}
         </button>
       </div>
     </form>

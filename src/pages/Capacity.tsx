@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Gauge, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Gauge, ChevronLeft, ChevronRight, AlertTriangle, Pencil } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
-import { canManageRequests } from '../lib/roles';
+import { canManageCatalog, canManageRequests } from '../lib/roles';
 import {
   addDays,
   buildCapacity,
@@ -12,21 +12,20 @@ import {
   formatHours,
   formatWeek,
   loggedByUserWeek,
+  summarizeTeams,
   startOfWeek,
   toDateKey,
+  UNASSIGNED_TEAM,
   utilization,
   utilizationClass,
   weekKeys
 } from '../lib/demand';
-import { ServiceRequest, User } from '../types';
-
-interface TeamSummary {
-  team: string;
-  members: number;
-  capacity: Record<string, number>;
-  planned: Record<string, number>;
-  logged: Record<string, number>;
-}
+import { Service, ServiceRequest, User } from '../types';
+import Modal from '../components/Modal';
+import PersonCapacity from '../components/capacity/PersonCapacity';
+import RenameTeamForm from '../components/capacity/RenameTeamForm';
+import TeamCapacity from '../components/capacity/TeamCapacity';
+import TeamConsumptionTable from '../components/capacity/TeamConsumptionTable';
 
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
@@ -36,9 +35,25 @@ const Capacity = () => {
   const [weekCount, setWeekCount] = useState(8);
   const [teamFilter, setTeamFilter] = useState('all');
   const [view, setView] = useState<'planned' | 'logged'>('planned');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [renamingTeam, setRenamingTeam] = useState<string | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const canRenameTeams = canManageCatalog(user?.role);
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const { data: users, loading: usersLoading } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
+  // The dashboard links here with a team to open
+  useEffect(() => {
+    const team = (location.state as { openTeam?: string } | null)?.openTeam;
+    if (team) {
+      setSelectedTeam(team);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
+
+  const { data: users, loading: usersLoading, update: updateUser } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
   const { data: requests, loading: requestsLoading } = useFirestore<ServiceRequest>({ collectionName: COLLECTIONS.REQUESTS });
+  const { data: services, update: updateService } = useFirestore<Service>({ collectionName: COLLECTIONS.SERVICES });
 
   const weeks = useMemo(
     () => weekKeys(addDays(startOfWeek(new Date()), weekOffset * 7), weekCount),
@@ -51,24 +66,25 @@ const Capacity = () => {
 
   const teams = [...new Set(rows.map(r => r.team))].sort();
   const visibleRows = rows.filter(r => teamFilter === 'all' || r.team === teamFilter);
+  const selectedRow = rows.find(r => r.userId === selectedUserId) || null;
+
+  // Everyone in a team (including inactive users); "Unassigned" means no team set
+  const teamMembers = (team: string) => users.filter(u => (u.team || UNASSIGNED_TEAM) === team);
+  const teamServices = (team: string) => (team === UNASSIGNED_TEAM ? [] : services.filter(s => s.ownerTeam === team));
+
+  const handleRenameTeam = async (oldName: string, newName: string) => {
+    await Promise.all([
+      ...teamMembers(oldName).map(u => updateUser(u.id, { team: newName })),
+      ...teamServices(oldName).map(s => updateService(s.id, { ownerTeam: newName }))
+    ]);
+    if (teamFilter === oldName) setTeamFilter(newName);
+    setRenamingTeam(null);
+  };
 
   const loggedFor = (row: CapacityRow, week: string) => logged.get(row.userId)?.get(week) || 0;
   const cellHours = (row: CapacityRow, week: string) => (view === 'planned' ? row.allocated[week] : loggedFor(row, week));
 
-  const teamSummaries: TeamSummary[] = teams
-    .filter(t => teamFilter === 'all' || t === teamFilter)
-    .map(team => {
-      const members = rows.filter(r => r.team === team);
-      const perWeek = (fn: (r: CapacityRow, w: string) => number) =>
-        Object.fromEntries(weeks.map(w => [w, sum(members.map(m => fn(m, w)))]));
-      return {
-        team,
-        members: members.length,
-        capacity: perWeek(m => m.weeklyCapacity),
-        planned: perWeek((m, w) => m.allocated[w]),
-        logged: perWeek(loggedFor)
-      };
-    });
+  const teamSummaries = summarizeTeams(rows, weeks, logged).filter(t => teamFilter === 'all' || t.team === teamFilter);
 
   const totals = {
     capacity: sum(teamSummaries.flatMap(t => weeks.map(w => t.capacity[w]))),
@@ -194,37 +210,26 @@ const Capacity = () => {
             {view === 'planned' ? 'Planned hours' : 'Logged hours'} as a share of the team's combined weekly capacity
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">Team</th>
-                <th className="px-4 py-3 text-right font-medium">Period total</th>
-                <WeekHeaders />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {teamSummaries.map(t => {
-                const series = view === 'planned' ? t.planned : t.logged;
-                const totalHours = sum(weeks.map(w => series[w]));
-                const totalCapacity = sum(weeks.map(w => t.capacity[w]));
-                return (
-                  <tr key={t.team}>
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{t.team}</div>
-                      <div className="text-xs text-gray-500">{t.members} people</div>
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
-                      <div className="font-medium">{utilization(totalHours, totalCapacity)}%</div>
-                      <div className="text-xs text-gray-500">{formatHours(totalHours)} / {formatHours(totalCapacity)}</div>
-                    </td>
-                    {weeks.map(w => <Cell key={w} hours={series[w]} capacity={t.capacity[w]} isCurrent={w === thisWeek} />)}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <TeamConsumptionTable
+          summaries={teamSummaries}
+          weeks={weeks}
+          view={view}
+          thisWeek={thisWeek}
+          onSelectTeam={setSelectedTeam}
+          teamActions={team =>
+            canRenameTeams && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); setRenamingTeam(team); }}
+                className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                title={team === UNASSIGNED_TEAM ? 'Give these people a team' : 'Rename team'}
+                aria-label={`Rename ${team}`}
+              >
+                <Pencil size={13} />
+              </button>
+            )
+          }
+        />
       </div>
 
       <div className="card overflow-hidden">
@@ -257,9 +262,20 @@ const Capacity = () => {
                 <tr><td colSpan={weeks.length + 2} className="px-4 py-8 text-center text-gray-500">No active users.</td></tr>
               ) : (
                 visibleRows.map(row => (
-                  <tr key={row.userId}>
+                  <tr
+                    key={row.userId}
+                    onClick={() => setSelectedUserId(row.userId)}
+                    className="cursor-pointer hover:bg-blue-50/50 transition-colors"
+                    title="View assigned requests and consumption"
+                  >
                     <td className="px-4 py-2">
-                      <div className="font-medium">{row.name}</div>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setSelectedUserId(row.userId); }}
+                        className="font-medium text-blue-700 hover:underline text-left"
+                      >
+                        {row.name}
+                      </button>
                       <div className="text-xs text-gray-500">{row.team}</div>
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatHours(row.weeklyCapacity)}</td>
@@ -271,6 +287,58 @@ const Capacity = () => {
           </table>
         </div>
       </div>
+
+      {renamingTeam && (
+        <Modal
+          title={renamingTeam === UNASSIGNED_TEAM ? 'Assign a team' : `Rename ${renamingTeam}`}
+          subtitle={renamingTeam === UNASSIGNED_TEAM ? 'Give everyone without a team a team name' : 'Updates every member of this team'}
+          onClose={() => setRenamingTeam(null)}
+          width="max-w-lg"
+        >
+          <RenameTeamForm
+            team={renamingTeam}
+            memberNames={teamMembers(renamingTeam).map(u => u.displayName || u.email || 'Unknown')}
+            serviceCount={teamServices(renamingTeam).length}
+            existingTeams={[...new Set([...users.map(u => u.team), ...services.map(s => s.ownerTeam)].filter(Boolean) as string[])].sort()}
+            onSubmit={newName => handleRenameTeam(renamingTeam, newName)}
+            onCancel={() => setRenamingTeam(null)}
+          />
+        </Modal>
+      )}
+
+      {selectedTeam && (
+        <Modal
+          title={selectedTeam}
+          subtitle={`Team · ${formatWeek(weeks[0])} – ${formatWeek(weeks[weeks.length - 1])} (${weeks.length} weeks)`}
+          onClose={() => setSelectedTeam(null)}
+          width="max-w-6xl"
+        >
+          <TeamCapacity
+            members={rows.filter(r => r.team === selectedTeam)}
+            requests={requests}
+            weeks={weeks}
+            logged={logged}
+            onSelectMember={setSelectedUserId}
+          />
+        </Modal>
+      )}
+
+      {/* Rendered after the team view so a person opened from it appears on top */}
+      {selectedRow && (
+        <Modal
+          title={selectedRow.name}
+          subtitle={`${selectedRow.team} · ${formatWeek(weeks[0])} – ${formatWeek(weeks[weeks.length - 1])} (${weeks.length} weeks)`}
+          onClose={() => setSelectedUserId(null)}
+          width="max-w-5xl"
+        >
+          <PersonCapacity
+            row={selectedRow}
+            requests={requests}
+            weeks={weeks}
+            loggedByWeek={logged.get(selectedRow.userId) || new Map()}
+          />
+        </Modal>
+      )}
     </div>
   );
 };

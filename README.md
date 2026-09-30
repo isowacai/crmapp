@@ -6,9 +6,9 @@ Built with React, TypeScript, Tailwind CSS, and Firebase.
 
 ## Features
 
-- **Service catalog**: predefined services with a delivering team, standard effort, and target turnaround
-- **Service requests**: numbered `REQ-YYYYMMDD-NNNN`, with impact × urgency priority (P1–P4) and a full history
-- **Triage and assignment**: leads and managers assign requests with an estimate and planned dates,
+- **Service catalog**: predefined services, each with a category and delivering team
+- **Service requests**: numbered `REQ-YYYYMMDD-NNNN`; staff describe the need, and every new request goes to the triage queue
+- **Triage and assignment**: leads and managers set impact × urgency priority (P1–P4), an estimate, and planned dates,
   seeing each person's existing load and a warning if they'd go over capacity
 - **Capacity**: per-person weekly capacity, planned vs. logged hours, and team consumption reports
 - **Dashboards**: backlog, demand trend, most requested services, on-time delivery, lead time, utilization

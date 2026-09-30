@@ -6,12 +6,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
 import { canManageRequests } from '../lib/roles';
 import {
-  computePriority,
   formatHours,
   generateDailyNumber,
   isOpen,
   isOverdue,
   PRIORITIES,
+  priorityRank,
   STATUS_STYLES
 } from '../lib/demand';
 import { Priority, RequestStatus, Service, ServiceRequest, User } from '../types';
@@ -21,8 +21,6 @@ import NewRequestForm, { NewRequestData } from '../components/requests/NewReques
 import RequestDetails, { RequestChange } from '../components/requests/RequestDetails';
 
 type Tab = 'mine' | 'assigned' | 'triage' | 'all';
-
-const PRIORITY_RANK: Record<Priority, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
 
 const Requests = () => {
   const { user } = useAuth();
@@ -37,19 +35,24 @@ const Requests = () => {
   const [tab, setTab] = useState<Tab>(isManager ? 'triage' : 'mine');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'open' | 'all'>('open');
-  const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<Priority | 'none' | 'all'>('all');
   const [newServiceId, setNewServiceId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // "Request" button on the catalog opens the form here with that service selected
+  // Other pages link here with state: the catalog's "Request" button opens the new-request form,
+  // and the Capacity page opens a specific request
   useEffect(() => {
-    const serviceId = (location.state as { newRequestServiceId?: string } | null)?.newRequestServiceId;
-    if (serviceId) {
-      setNewServiceId(serviceId);
+    const state = location.state as { newRequestServiceId?: string; openRequestId?: string } | null;
+    if (state?.newRequestServiceId) setNewServiceId(state.newRequestServiceId);
+    if (state?.openRequestId) {
+      setSelectedId(state.openRequestId);
+      if (isManager) setTab('all');
+    }
+    if (state?.newRequestServiceId || state?.openRequestId) {
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location, navigate]);
+  }, [location, navigate, isManager]);
 
   const activeServices = useMemo(
     () => services.filter(s => s.active).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
@@ -77,14 +80,14 @@ const Requests = () => {
       return true;
     })
     .filter(r => (tab === 'triage' || statusFilter === 'all' ? true : statusFilter === 'open' ? isOpen(r) : r.status === statusFilter))
-    .filter(r => priorityFilter === 'all' || r.priority === priorityFilter)
+    .filter(r => priorityFilter === 'all' || (priorityFilter === 'none' ? !r.priority : r.priority === priorityFilter))
     .filter(r =>
       `${r.requestNumber} ${r.title} ${r.serviceName} ${r.requesterName} ${r.assigneeName}`.toLowerCase().includes(search.toLowerCase())
     )
     .sort(
       (a, b) =>
         Number(isOpen(b)) - Number(isOpen(a)) ||
-        PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
+        priorityRank(a.priority) - priorityRank(b.priority) ||
         (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
     );
 
@@ -115,9 +118,10 @@ const Requests = () => {
         requesterId: user.id,
         requesterName: user.displayName,
         requesterTeam: user.team || '',
-        impact: data.impact,
-        urgency: data.urgency,
-        priority: computePriority(data.impact, data.urgency),
+        // Impact, urgency, and priority are set by a lead or manager during triage
+        impact: '',
+        urgency: '',
+        priority: '',
         status: 'submitted',
         neededBy: data.neededBy,
         assigneeId: '',
@@ -222,11 +226,12 @@ const Requests = () => {
             )}
             <select
               value={priorityFilter}
-              onChange={e => setPriorityFilter(e.target.value as Priority | 'all')}
+              onChange={e => setPriorityFilter(e.target.value as Priority | 'none' | 'all')}
               className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="all">All priorities</option>
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              <option value="none">Not set</option>
             </select>
           </div>
         </div>

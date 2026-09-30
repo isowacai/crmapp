@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Inbox, ListTodo, AlarmClock, CheckCircle2, Timer, Target, Gauge, ClipboardList } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Inbox, ListTodo, AlarmClock, CheckCircle2, Timer, Target, Gauge, ClipboardList, AlertTriangle } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
@@ -8,13 +8,16 @@ import { canManageRequests } from '../lib/roles';
 import {
   addDays,
   buildCapacity,
+  loggedByUserWeek,
+  summarizeTeams,
   firestoreDate,
   formatWeek,
   isOpen,
   isOverdue,
+  formatHours,
   OPEN_STATUSES,
   PRIORITIES,
-  PRIORITY_STYLES,
+  priorityRank,
   startOfWeek,
   STATUS_STYLES,
   toDateKey,
@@ -23,8 +26,11 @@ import {
 } from '../lib/demand';
 import { ServiceRequest, User } from '../types';
 import DashboardCard from '../components/DashboardCard';
-import PieChart from '../components/PieChart';
-import BarList from '../components/BarList';
+import DonutChart from '../components/charts/DonutChart';
+import ColumnChart from '../components/charts/ColumnChart';
+import BarChart from '../components/charts/BarChart';
+import { NEUTRAL, PRIORITY_RAMP, SERIES, STATUS } from '../components/charts/chartTheme';
+import TeamConsumptionTable from '../components/capacity/TeamConsumptionTable';
 import { PriorityBadge, StatusBadge } from '../components/RequestBadges';
 
 const DAY = 86400000;
@@ -37,31 +43,16 @@ const Panel = ({ title, subtitle, children }: { title: string; subtitle?: string
   </div>
 );
 
-// Two-series weekly column chart (created vs completed)
-const WeeklyColumns = ({ weeks, created, completed }: { weeks: string[]; created: number[]; completed: number[] }) => {
-  const max = Math.max(...created, ...completed, 1);
-  return (
-    <div>
-      <div className="flex items-end gap-2 h-40">
-        {weeks.map((w, i) => (
-          <div key={w} className="flex-1 flex items-end justify-center gap-0.5 h-full" title={`${formatWeek(w)}: ${created[i]} new, ${completed[i]} completed`}>
-            <div className="w-1/2 max-w-4 bg-blue-500 rounded-t" style={{ height: `${(created[i] / max) * 100}%` }} />
-            <div className="w-1/2 max-w-4 bg-emerald-500 rounded-t" style={{ height: `${(completed[i] / max) * 100}%` }} />
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2 mt-2">
-        {weeks.map(w => (
-          <div key={w} className="flex-1 text-center text-[10px] text-gray-500">{formatWeek(w)}</div>
-        ))}
-      </div>
-      <div className="flex gap-4 mt-3 text-xs text-gray-600">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500" /> New</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500" /> Completed</span>
-      </div>
-    </div>
-  );
+// Fixed colour per open status (colour follows the status, never its rank)
+const STATUS_COLORS: Record<string, string> = {
+  submitted: SERIES[0],
+  assigned: SERIES[1],
+  'in-progress': SERIES[2],
+  'on-hold': SERIES[3]
 };
+
+// Up to 7 categories get their own colour (in catalog order); the rest fold into "Other"
+const MAX_CATEGORY_SLOTS = 7;
 
 const RequestList = ({ requests, empty }: { requests: ServiceRequest[]; empty: string }) =>
   requests.length === 0 ? (
@@ -89,9 +80,12 @@ const RequestList = ({ requests, empty }: { requests: ServiceRequest[]; empty: s
 const Dashboard = () => {
   const { user } = useAuth();
   const isManager = canManageRequests(user?.role);
+  const navigate = useNavigate();
+  const [consumptionView, setConsumptionView] = useState<'planned' | 'logged'>('planned');
 
   const { data: requests, loading: requestsLoading } = useFirestore<ServiceRequest>({ collectionName: COLLECTIONS.REQUESTS });
   const { data: users, loading: usersLoading } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
+  const { data: categoryDocs } = useFirestore<{ name: string }>({ collectionName: COLLECTIONS.CATEGORIES });
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -116,13 +110,22 @@ const Dashboard = () => {
     const createdPerWeek = weeks.map(w => requests.filter(r => weekOf(firestoreDate(r.createdAt)) === w).length);
     const completedPerWeek = weeks.map(w => completed.filter(r => weekOf(firestoreDate(r.completedAt)) === w).length);
 
-    // Demand by service, last 90 days
+    // Demand by service and by category, last 90 days
+    const recent = requests.filter(r => (firestoreDate(r.createdAt)?.getTime() ?? 0) >= since(90));
     const byService = new Map<string, number>();
-    for (const r of requests) {
-      if ((firestoreDate(r.createdAt)?.getTime() ?? 0) >= since(90)) {
-        byService.set(r.serviceName, (byService.get(r.serviceName) || 0) + 1);
-      }
-    }
+    for (const r of recent) byService.set(r.serviceName, (byService.get(r.serviceName) || 0) + 1);
+
+    const coloured = categoryDocs.map(c => c.name).sort().slice(0, MAX_CATEGORY_SLOTS);
+    const byCategory = coloured.map((name, i) => ({
+      key: name,
+      label: name,
+      value: recent.filter(r => r.category === name).length,
+      color: SERIES[i]
+    }));
+    const otherCount = recent.filter(r => !coloured.includes(r.category)).length;
+    if (otherCount) byCategory.push({ key: '__other', label: 'Other', value: otherCount, color: NEUTRAL });
+
+    const consumptionWeeks = weekKeys(addDays(startOfWeek(now), -21), 8);
 
     // Team utilization this week (planned)
     const thisWeek = weekKeys(now, 1);
@@ -148,10 +151,14 @@ const Dashboard = () => {
       createdPerWeek,
       completedPerWeek,
       byService: [...byService.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
+      byCategory,
       teamLoad: [...teamLoad.entries()].sort((a, b) => a[0].localeCompare(b[0])),
-      utilizationPct: utilization(totalPlanned, totalCapacity)
+      utilizationPct: utilization(totalPlanned, totalCapacity),
+      // Team consumption: 3 weeks back, this week, and 4 weeks ahead
+      consumptionWeeks,
+      teamConsumption: summarizeTeams(buildCapacity(users, requests, consumptionWeeks), consumptionWeeks, loggedByUserWeek(requests))
     };
-  }, [requests, users]);
+  }, [requests, users, categoryDocs]);
 
   if (requestsLoading || usersLoading || !user) {
     return (
@@ -163,7 +170,7 @@ const Dashboard = () => {
 
   const myRequests = requests.filter(r => r.requesterId === user.id);
   const myWork = requests.filter(r => r.assigneeId === user.id && isOpen(r));
-  const byPriority = (a: ServiceRequest, b: ServiceRequest) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority);
+  const byPriority = (a: ServiceRequest, b: ServiceRequest) => priorityRank(a.priority) - priorityRank(b.priority);
 
   const personal = (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
@@ -192,10 +199,16 @@ const Dashboard = () => {
   }
 
   const statusData = OPEN_STATUSES.map(s => ({
+    key: s,
     label: STATUS_STYLES[s].label,
     value: stats.open.filter(r => r.status === s).length,
-    color: STATUS_STYLES[s].color
-  })).filter(d => d.value > 0);
+    color: STATUS_COLORS[s]
+  }));
+
+  const priorityCounts = [
+    ...PRIORITIES.map(p => stats.open.filter(r => r.priority === p).length),
+    stats.open.filter(r => !r.priority).length
+  ];
 
   const attention = [...stats.overdue, ...stats.open.filter(r => r.priority === 'P1' && !isOverdue(r))]
     .sort(byPriority)
@@ -227,45 +240,115 @@ const Dashboard = () => {
         </Link>
       </div>
 
+      <div className="card mt-6 overflow-hidden">
+        <div className="p-6 pb-4 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Team consumption by week</h2>
+            <p className="text-sm text-gray-500">
+              {consumptionView === 'planned' ? 'Planned hours' : 'Logged hours'} as a share of each team's combined capacity ·
+              last 3 weeks, this week, and the next 4
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 text-xs text-gray-600">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100" /> under 80%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100" /> 80–100%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100" /> over 100%</span>
+            </div>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+              {(['planned', 'logged'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setConsumptionView(v)}
+                  className={`px-3 py-1.5 font-medium ${consumptionView === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                  {v === 'planned' ? 'Planned' : 'Actual (logged)'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <TeamConsumptionTable
+          summaries={stats.teamConsumption}
+          weeks={stats.consumptionWeeks}
+          view={consumptionView}
+          thisWeek={toDateKey(startOfWeek(new Date()))}
+          onSelectTeam={team => navigate('/capacity', { state: { openTeam: team } })}
+        />
+        <p className="px-6 py-3 text-xs text-gray-500 border-t border-gray-100">
+          Click a team to see its members, requests, and weekly detail on the Capacity page.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-        <Panel title="Open requests by status">
-          {statusData.length ? (
-            <div className="flex justify-center"><PieChart data={statusData} size={160} title="" /></div>
-          ) : (
-            <p className="text-sm text-gray-500">No open requests.</p>
-          )}
+        <Panel title="Open requests by status" subtitle="Where open work currently sits">
+          <DonutChart data={statusData} centerLabel="open" emptyText="No open requests." />
         </Panel>
-        <Panel title="Open backlog by priority">
-          <BarList
-            items={PRIORITIES.map(p => ({
-              label: PRIORITY_STYLES[p].label,
-              value: stats.open.filter(r => r.priority === p).length,
-              color: PRIORITY_STYLES[p].color
-            }))}
+        <Panel title="Demand by category" subtitle="Requests raised in the last 90 days">
+          <DonutChart data={stats.byCategory} centerLabel="requests" emptyText="No requests in the last 90 days." />
+        </Panel>
+        <Panel title="Open backlog by priority" subtitle="Darker is more urgent">
+          <ColumnChart
+            categories={[...PRIORITIES, 'Not set']}
+            series={[{
+              key: 'open',
+              label: 'Open requests',
+              values: priorityCounts,
+              color: PRIORITY_RAMP.P2,
+              colors: [PRIORITY_RAMP.P1, PRIORITY_RAMP.P2, PRIORITY_RAMP.P3, PRIORITY_RAMP.P4, NEUTRAL]
+            }]}
+            height={170}
+            showValues
           />
         </Panel>
-        <Panel title="Team utilization this week" subtitle="Planned hours ÷ capacity">
-          <BarList
-            items={stats.teamLoad.map(([team, t]) => {
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        <div className="lg:col-span-2">
+          <Panel title="Demand trend" subtitle="New and completed requests per week, last 8 weeks">
+            <ColumnChart
+              categories={stats.weeks.map(formatWeek)}
+              series={[
+                { key: 'new', label: 'New', values: stats.createdPerWeek, color: SERIES[0] },
+                { key: 'completed', label: 'Completed', values: stats.completedPerWeek, color: SERIES[1] }
+              ]}
+              height={200}
+            />
+          </Panel>
+        </div>
+        <Panel title="Team utilization this week" subtitle="Planned hours as a share of capacity">
+          <BarChart
+            data={stats.teamLoad.map(([team, t]) => {
               const pct = utilization(t.planned, t.capacity);
-              return { label: team, value: pct, suffix: '%', color: pct > 100 ? '#dc2626' : pct >= 80 ? '#d97706' : '#059669' };
+              const over = pct > 100;
+              return {
+                key: team,
+                label: team,
+                value: pct,
+                valueLabel: `${pct}%`,
+                color: over ? STATUS.critical : pct >= 80 ? STATUS.warning : STATUS.good,
+                badge: over ? <AlertTriangle size={14} className="text-red-600" aria-label="Over capacity" /> : undefined,
+                tooltip: <div className="text-gray-500 mt-1">{formatHours(t.planned)} planned of {formatHours(t.capacity)}</div>
+              };
             })}
-            max={Math.max(100, ...stats.teamLoad.map(([, t]) => utilization(t.planned, t.capacity)))}
+            reference={{ value: 100, label: '100%' }}
             emptyText="No users yet."
           />
+          <div className="flex flex-wrap gap-3 mt-4 text-xs text-gray-600">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STATUS.good }} /> Under 80%</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STATUS.warning }} /> 80–100%</span>
+            <span className="flex items-center gap-1.5"><AlertTriangle size={12} className="text-red-600" /> Over capacity</span>
+          </div>
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <Panel title="Demand trend" subtitle="New and completed requests per week">
-          <WeeklyColumns weeks={stats.weeks} created={stats.createdPerWeek} completed={stats.completedPerWeek} />
-        </Panel>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <Panel title="Most requested services" subtitle="Last 90 days">
-          <BarList items={stats.byService.map(([label, value]) => ({ label, value }))} emptyText="No requests in the last 90 days." />
+          <BarChart
+            data={stats.byService.map(([label, value]) => ({ key: label, label, value, color: SERIES[0] }))}
+            emptyText="No requests in the last 90 days."
+          />
         </Panel>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <Panel title="Needs attention" subtitle="Overdue and open P1 requests">
           <RequestList requests={attention} empty="Nothing overdue or critical." />
         </Panel>

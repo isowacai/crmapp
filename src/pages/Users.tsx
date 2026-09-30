@@ -2,7 +2,8 @@ import React, { useState, memo } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types';
-import { Users as UsersIcon, UserPlus, Eye, Pencil, Trash2, X, Shield, Search, Filter } from 'lucide-react';
+import { Users as UsersIcon, UserPlus, Eye, Pencil, Trash2, X, Shield, Search, Filter, KeyRound, CheckCircle2 } from 'lucide-react';
+import Modal from '../components/Modal';
 import { Navigate } from 'react-router-dom';
 import { COLLECTIONS } from '../lib/firebase';
 import { DEFAULT_WEEKLY_CAPACITY, normalizeRole, ROLE_LABELS } from '../lib/roles';
@@ -161,7 +162,10 @@ const formatDate = (date: Date | { seconds: number; nanoseconds: number } | null
 };
 
 const Users = () => {
-  const { user: currentUser, signUp, updateUserRole } = useAuth();
+  const { user: currentUser, signUp, updateUserRole, resetPassword } = useAuth();
+  const [resetUser, setResetUser] = useState<User | null>(null);
+  const [resetSending, setResetSending] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -288,6 +292,16 @@ const Users = () => {
         </button>
       </div>
 
+      {notice && (
+        <div className="mb-6 p-4 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-2">
+          <CheckCircle2 size={18} className="shrink-0" />
+          {notice}
+          <button onClick={() => setNotice(null)} className="ml-auto p-1 rounded hover:bg-emerald-100" aria-label="Dismiss">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-600 border border-red-200 flex items-center gap-2">
           <div className="p-2 bg-red-100 rounded-full">
@@ -405,6 +419,14 @@ const Users = () => {
                         <Pencil size={18} />
                       </button>
                       <button
+                        onClick={() => { setError(null); setNotice(null); setResetUser(user); }}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={user.email ? 'Send password reset email' : 'No email address on file'}
+                        disabled={!user.email}
+                      >
+                        <KeyRound size={18} />
+                      </button>
+                      <button
                         onClick={() => handleDelete(user)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete user"
@@ -420,6 +442,55 @@ const Users = () => {
           </table>
         </div>
       </div>
+
+      {/* Password reset confirmation */}
+      {resetUser && (
+        <Modal
+          title="Reset password"
+          subtitle={resetUser.displayName}
+          onClose={() => setResetUser(null)}
+          width="max-w-md"
+        >
+          <div className="space-y-4 text-sm text-gray-700">
+            <p>
+              Send a password reset email to <span className="font-medium">{resetUser.email}</span>?
+            </p>
+            <p className="text-gray-500">
+              They'll get a secure link to choose a new password. Their current password keeps working until they do.
+              The link expires after a short time; you can send another if needed.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setResetUser(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={resetSending}
+                onClick={async () => {
+                  if (!resetUser.email) return;
+                  setResetSending(true);
+                  try {
+                    await resetPassword(resetUser.email);
+                    setNotice(`Password reset email sent to ${resetUser.email}.`);
+                    setResetUser(null);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Could not send the password reset email');
+                    setResetUser(null);
+                  } finally {
+                    setResetSending(false);
+                  }
+                }}
+                className="btn-primary flex items-center gap-2 disabled:opacity-60"
+              >
+                <KeyRound size={16} />
+                {resetSending ? 'Sending…' : 'Send reset email'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Add/Edit Modal */}
       {(isAddOpen || isEditOpen) && (

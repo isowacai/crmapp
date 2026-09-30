@@ -7,8 +7,13 @@ export const StatusBadge = ({ status }: { status: RequestStatus }) => (
   </span>
 );
 
-export const PriorityBadge = ({ priority }: { priority: Priority }) => (
-  <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${PRIORITY_STYLES[priority].badge}`}>
-    {priority}
-  </span>
-);
+export const PriorityBadge = ({ priority, long }: { priority: Priority | ''; long?: boolean }) =>
+  priority ? (
+    <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${PRIORITY_STYLES[priority].badge}`}>
+      {long ? PRIORITY_STYLES[priority].label : priority}
+    </span>
+  ) : (
+    <span className="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap border border-dashed border-gray-300 text-gray-500">
+      Not set
+    </span>
+  );

@@ -30,8 +30,6 @@ export interface Service {
   category: string;
   description: string;
   ownerTeam: string; // team that normally delivers this service
-  standardEffortHours: number; // default estimate when a request is assigned
-  slaDays: number; // target working days from assignment to completion
   active: boolean;
 }
 
@@ -70,9 +68,10 @@ export interface ServiceRequest {
   requesterId: string;
   requesterName: string;
   requesterTeam: string;
-  impact: Impact;
-  urgency: Urgency;
-  priority: Priority;
+  // Set by a lead or manager during triage; '' until then
+  impact: Impact | '';
+  urgency: Urgency | '';
+  priority: Priority | '';
   status: RequestStatus;
   neededBy: string; // YYYY-MM-DD, or '' if no date requested
   assigneeId: string;

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, Plus, Pencil, Search, Clock, Users as TeamIcon, Timer, Send } from 'lucide-react';
+import { LayoutGrid, Plus, Pencil, Search, Users as TeamIcon, Send } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
@@ -15,8 +15,6 @@ const emptyService: ServiceFormData = {
   category: '',
   description: '',
   ownerTeam: '',
-  standardEffortHours: 8,
-  slaDays: 5,
   active: true
 };
 
@@ -84,31 +82,6 @@ const ServiceForm = ({
           onChange={e => set('description', e.target.value)}
           required
         />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Standard effort (hours)</label>
-          <input
-            type="number"
-            min={0.5}
-            step={0.5}
-            className={inputClass}
-            value={form.standardEffortHours}
-            onChange={e => set('standardEffortHours', Number(e.target.value))}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Target turnaround (working days)</label>
-          <input
-            type="number"
-            min={1}
-            className={inputClass}
-            value={form.slaDays}
-            onChange={e => set('slaDays', Number(e.target.value))}
-            required
-          />
-        </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} className="rounded" />
@@ -242,8 +215,6 @@ const ServiceCatalog = () => {
               <p className="text-sm text-gray-600 mt-1 flex-1">{service.description}</p>
               <div className="mt-4 space-y-1 text-sm text-gray-600">
                 <div className="flex items-center gap-2"><TeamIcon size={14} /> {service.ownerTeam}</div>
-                <div className="flex items-center gap-2"><Clock size={14} /> ~{service.standardEffortHours}h effort</div>
-                <div className="flex items-center gap-2"><Timer size={14} /> {service.slaDays} working day turnaround</div>
               </div>
               <div className="mt-5 flex gap-2">
                 {service.active && (
@@ -276,8 +247,6 @@ const ServiceCatalog = () => {
               category: editing.category,
               description: editing.description,
               ownerTeam: editing.ownerTeam,
-              standardEffortHours: editing.standardEffortHours,
-              slaDays: editing.slaDays,
               active: editing.active
             } : emptyService}
             categories={categories}
