@@ -5,7 +5,6 @@ import { createQueryConstraints } from '../lib/firebase';
 interface FirestoreContextType {
   customersRef: () => QueryConstraint[];
   productsRef: () => QueryConstraint[];
-  tasksRef: () => QueryConstraint[];
 }
 
 const FirestoreContext = createContext<FirestoreContextType | undefined>(undefined);
@@ -19,15 +18,10 @@ export function FirestoreProvider({ children }: { children: React.ReactNode }) {
     return createQueryConstraints();
   };
 
-  const tasksRef = () => {
-    return createQueryConstraints();
-  };
-
   return (
     <FirestoreContext.Provider value={{
       customersRef,
-      productsRef,
-      tasksRef
+      productsRef
     }}>
       {children}
     </FirestoreContext.Provider>

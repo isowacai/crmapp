@@ -34,7 +34,8 @@ const Login = () => {
         await signIn(email, password);
         navigate('/dashboard');
       }
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as { code?: string; message?: string };
       let errorMessage = 'An error occurred';
       
       switch (err.code) {
@@ -76,7 +77,8 @@ const Login = () => {
       await resetPassword(email);
       setSuccess('If an account exists, you will receive a password reset email');
       setShowResetPassword(false);
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as { code?: string; message?: string };
       let errorMessage = 'Failed to send reset email';
       
       if (err.code === 'auth/invalid-email') {

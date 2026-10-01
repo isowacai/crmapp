@@ -1,7 +1,7 @@
 import React, { useState, memo } from 'react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
-import { User, UserRole } from '../types';
+import { Team, User, UserRole } from '../types';
 import { Users as UsersIcon, UserPlus, Eye, Pencil, Trash2, X, Shield, Search, Filter, KeyRound, CheckCircle2 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { Navigate } from 'react-router-dom';
@@ -13,7 +13,7 @@ interface UserFormData {
   password: string;
   displayName: string;
   role: UserRole;
-  team: string;
+  teamId: string;
   weeklyCapacityHours: number;
 }
 
@@ -28,14 +28,14 @@ const UserForm = memo(({
   onCancel: () => void;
   initialData?: Partial<UserFormData>;
   isAdd?: boolean;
-  teams: string[];
+  teams: Team[];
 }) => {
   const [formData, setFormData] = useState<UserFormData>({
     email: initialData?.email || '',
     password: '',
     displayName: initialData?.displayName || '',
     role: initialData?.role || 'staff',
-    team: initialData?.team || '',
+    teamId: initialData?.teamId || '',
     weeklyCapacityHours: initialData?.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY
   });
 
@@ -84,6 +84,11 @@ const UserForm = memo(({
           required
         />
       </div>
+      {isAdd ? (
+        <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+          New users start as <strong>Staff</strong>. To make them a lead, manager, or admin, edit them after the account is created.
+        </p>
+      ) : (
       <div>
         <label className="block text-sm font-medium text-gray-700">Role</label>
         <select
@@ -98,19 +103,18 @@ const UserForm = memo(({
         </select>
         <p className="mt-1 text-xs text-gray-500">Leads and managers can triage and assign requests; admins also manage the catalog and users.</p>
       </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Team</label>
-          <input
-            type="text"
-            value={formData.team}
-            onChange={(e) => handleChange('team', e.target.value)}
-            list="user-teams"
+          <select
+            value={formData.teamId}
+            onChange={(e) => handleChange('teamId', e.target.value)}
             className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-          <datalist id="user-teams">
-            {teams.map(t => <option key={t} value={t} />)}
-          </datalist>
+          >
+            <option value="">No team</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Capacity (hours/week)</label>
@@ -178,8 +182,10 @@ const Users = () => {
   const { data: users, loading, error: fetchError, update, remove } = useFirestore<User>({
     collectionName: COLLECTIONS.USERS
   });
+  const { data: teamDocs } = useFirestore<Team>({ collectionName: COLLECTIONS.TEAMS });
 
-  const teams = [...new Set(users.map(u => u.team).filter(Boolean) as string[])].sort();
+  const teams = [...teamDocs].sort((a, b) => a.name.localeCompare(b.name));
+  const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? '';
 
   // Redirect non-admin users
   if (!currentUser || currentUser.role !== 'admin') {
@@ -217,8 +223,10 @@ const Users = () => {
       setError(null);
       
       if (isAddOpen) {
-        await signUp(formData.email, formData.password, formData.displayName, formData.role, {
-          team: formData.team,
+        // Security rules only allow new accounts to start as staff
+        await signUp(formData.email, formData.password, formData.displayName, 'staff', {
+          teamId: formData.teamId,
+          team: teamName(formData.teamId),
           weeklyCapacityHours: formData.weeklyCapacityHours
         });
         setIsAddOpen(false);
@@ -227,7 +235,8 @@ const Users = () => {
         await update(selectedUser.id, {
           displayName: formData.displayName,
           role: formData.role,
-          team: formData.team,
+          teamId: formData.teamId,
+          team: teamName(formData.teamId),
           weeklyCapacityHours: formData.weeklyCapacityHours
         });
         setIsEditOpen(false);
@@ -527,7 +536,7 @@ const Users = () => {
                 email: selectedUser.email || '',
                 displayName: selectedUser.displayName,
                 role: normalizeRole(selectedUser.role),
-                team: selectedUser.team || '',
+                teamId: selectedUser.teamId || '',
                 weeklyCapacityHours: selectedUser.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY,
                 password: '' // Add empty password for the form
               } : undefined}

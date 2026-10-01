@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Inbox, ListTodo, AlarmClock, CheckCircle2, Timer, Target, Gauge, ClipboardList, AlertTriangle } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
+import { useVisibleRequests } from '../hooks/useVisibleRequests';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
-import { canManageRequests } from '../lib/roles';
+import { canManageRequests, usersInScope } from '../lib/roles';
 import {
   addDays,
   buildCapacity,
@@ -15,6 +16,7 @@ import {
   isOpen,
   isOverdue,
   formatHours,
+  INTAKE_STATUSES,
   OPEN_STATUSES,
   PRIORITIES,
   priorityRank,
@@ -24,6 +26,7 @@ import {
   utilization,
   weekKeys
 } from '../lib/demand';
+import { PRIORITY_STYLES } from '../lib/priority';
 import { ServiceRequest, User } from '../types';
 import DashboardCard from '../components/DashboardCard';
 import DonutChart from '../components/charts/DonutChart';
@@ -45,10 +48,13 @@ const Panel = ({ title, subtitle, children }: { title: string; subtitle?: string
 
 // Fixed colour per open status (colour follows the status, never its rank)
 const STATUS_COLORS: Record<string, string> = {
-  submitted: SERIES[0],
-  assigned: SERIES[1],
-  'in-progress': SERIES[2],
-  'on-hold': SERIES[3]
+  new: SERIES[0],
+  assessing: SERIES[1],
+  approved: SERIES[2],
+  planned: SERIES[3],
+  committed: SERIES[4],
+  'in-progress': SERIES[5],
+  blocked: SERIES[6]
 };
 
 // Up to 7 categories get their own colour (in catalog order); the rest fold into "Other"
@@ -83,8 +89,10 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [consumptionView, setConsumptionView] = useState<'planned' | 'logged'>('planned');
 
-  const { data: requests, loading: requestsLoading } = useFirestore<ServiceRequest>({ collectionName: COLLECTIONS.REQUESTS });
-  const { data: users, loading: usersLoading } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
+  const { data: requests, loading: requestsLoading } = useVisibleRequests(user);
+  const { data: allUsers, loading: usersLoading } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
+  // Leads and managers see their own team's capacity; admins see everyone
+  const users = useMemo(() => usersInScope(allUsers, user), [allUsers, user]);
   const { data: categoryDocs } = useFirestore<{ name: string }>({ collectionName: COLLECTIONS.CATEGORIES });
 
   const stats = useMemo(() => {
@@ -142,7 +150,7 @@ const Dashboard = () => {
 
     return {
       open,
-      triage: requests.filter(r => r.status === 'submitted'),
+      triage: requests.filter(r => INTAKE_STATUSES.includes(r.status)),
       overdue: open.filter(r => isOverdue(r)),
       completed30: completed.filter(r => (firestoreDate(r.completedAt)?.getTime() ?? 0) >= since(30)).length,
       onTimePct: withDue.length ? Math.round((onTime.length / withDue.length) * 100) : null,
@@ -210,7 +218,7 @@ const Dashboard = () => {
     stats.open.filter(r => !r.priority).length
   ];
 
-  const attention = [...stats.overdue, ...stats.open.filter(r => r.priority === 'P1' && !isOverdue(r))]
+  const attention = [...stats.overdue, ...stats.open.filter(r => r.priority === 'critical' && !isOverdue(r))]
     .sort(byPriority)
     .slice(0, 6);
 
@@ -220,7 +228,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard title="Open requests" value={stats.open.length} icon={Inbox} color="bg-blue-600" />
-        <DashboardCard title="Awaiting triage" value={stats.triage.length} icon={ListTodo} color="bg-purple-600" />
+        <DashboardCard title="Awaiting assessment" value={stats.triage.length} icon={ListTodo} color="bg-purple-600" />
         <DashboardCard title="Overdue" value={stats.overdue.length} icon={AlarmClock} color="bg-red-600" />
         <DashboardCard title="Completed (30 days)" value={stats.completed30} icon={CheckCircle2} color="bg-emerald-600" />
       </div>
@@ -289,13 +297,13 @@ const Dashboard = () => {
         </Panel>
         <Panel title="Open backlog by priority" subtitle="Darker is more urgent">
           <ColumnChart
-            categories={[...PRIORITIES, 'Not set']}
+            categories={[...PRIORITIES.map(p => PRIORITY_STYLES[p].label), 'Not assessed']}
             series={[{
               key: 'open',
               label: 'Open requests',
               values: priorityCounts,
-              color: PRIORITY_RAMP.P2,
-              colors: [PRIORITY_RAMP.P1, PRIORITY_RAMP.P2, PRIORITY_RAMP.P3, PRIORITY_RAMP.P4, NEUTRAL]
+              color: PRIORITY_RAMP.high,
+              colors: [PRIORITY_RAMP.critical, PRIORITY_RAMP.high, PRIORITY_RAMP.medium, PRIORITY_RAMP.low, NEUTRAL]
             }]}
             height={170}
             showValues
@@ -349,13 +357,13 @@ const Dashboard = () => {
             emptyText="No requests in the last 90 days."
           />
         </Panel>
-        <Panel title="Needs attention" subtitle="Overdue and open P1 requests">
+        <Panel title="Needs attention" subtitle="Overdue and open critical demand">
           <RequestList requests={attention} empty="Nothing overdue or critical." />
         </Panel>
-        <Panel title="Awaiting triage" subtitle="Oldest first">
+        <Panel title="Awaiting assessment" subtitle="Oldest first">
           <RequestList
             requests={[...stats.triage].sort((a, b) => (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0)).slice(0, 6)}
-            empty="The triage queue is empty."
+            empty="Nothing is waiting for assessment."
           />
           <Link to="/requests" className="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-700">Go to requests →</Link>
         </Panel>

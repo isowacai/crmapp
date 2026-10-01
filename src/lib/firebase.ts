@@ -16,7 +16,7 @@ export const COLLECTIONS = {
   CATEGORIES: 'categories',
   SERVICES: 'services',
   REQUESTS: 'requests',
-  TASKS: 'tasks'
+  TEAMS: 'teams'
 } as const;
 
 // Helper functions for common queries

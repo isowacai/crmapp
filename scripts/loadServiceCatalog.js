@@ -1,12 +1,8 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
-import { firebaseConfig } from '../../config/firebaseConfig.js';
-
 // Loads a starter service catalog. Only adds categories and services whose names don't exist yet,
 // so it is safe to run more than once. Edit the lists below to suit your organisation.
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import { Timestamp } from 'firebase-admin/firestore';
+import { db, projectId } from '../config/firebaseAdmin.js';
+import { slugify } from './migrations/teamsAndPipeline.js';
 
 const categories = ['IT Support', 'Software & Access', 'Data & Reporting', 'Facilities', 'HR & People'];
 
@@ -37,31 +33,40 @@ const services = [
     description: 'Arrange internal or external training for a person or team.' }
 ];
 
-const loadServiceCatalog = async () => {
-  try {
-    const existingCategories = new Set((await getDocs(collection(db, 'categories'))).docs.map(d => d.data().name));
-    const existingServices = new Set((await getDocs(collection(db, 'services'))).docs.map(d => d.data().name));
+const existingNames = async collection => new Set((await db.collection(collection).get()).docs.map(d => d.get('name')));
 
-    let addedCategories = 0;
-    for (const name of categories) {
-      if (existingCategories.has(name)) continue;
-      await addDoc(collection(db, 'categories'), { name, createdAt: Timestamp.now() });
-      addedCategories++;
-    }
+// Each service belongs to the team that delivers it; create any team that doesn't exist yet
+const teams = new Map((await db.collection('teams').get()).docs.map(d => [String(d.get('name')).toLowerCase(), d.id]));
+let addedTeams = 0;
+for (const name of new Set(services.map(s => s.ownerTeam))) {
+  if (teams.has(name.toLowerCase())) continue;
+  let id = slugify(name);
+  for (let i = 2; [...teams.values()].includes(id); i++) id = `${slugify(name)}-${i}`;
+  await db.collection('teams').doc(id).set({ name, description: '', managerIds: [], createdAt: Timestamp.now() });
+  teams.set(name.toLowerCase(), id);
+  addedTeams++;
+}
 
-    let addedServices = 0;
-    for (const service of services) {
-      if (existingServices.has(service.name)) continue;
-      await addDoc(collection(db, 'services'), { ...service, active: true, createdAt: Timestamp.now() });
-      addedServices++;
-    }
+const existingCategories = await existingNames('categories');
+const existingServices = await existingNames('services');
 
-    console.log(`Added ${addedCategories} categories and ${addedServices} services.`);
-    process.exit(0);
-  } catch (error) {
-    console.error('Error loading service catalog:', error);
-    process.exit(1);
-  }
-};
+let addedCategories = 0;
+for (const name of categories) {
+  if (existingCategories.has(name)) continue;
+  await db.collection('categories').add({ name, createdAt: Timestamp.now() });
+  addedCategories++;
+}
 
-loadServiceCatalog();
+let addedServices = 0;
+for (const service of services) {
+  if (existingServices.has(service.name)) continue;
+  await db.collection('services').add({
+    ...service,
+    teamId: teams.get(service.ownerTeam.toLowerCase()),
+    active: true,
+    createdAt: Timestamp.now()
+  });
+  addedServices++;
+}
+
+console.log(`[${projectId}] Added ${addedTeams} teams, ${addedCategories} categories, and ${addedServices} services.`);

@@ -1,46 +1,44 @@
-import { Impact, Priority, RequestStatus, ServiceRequest, Urgency, User } from '../types';
+import { PriorityLevel, RequestStatus, ServiceRequest, User } from '../types';
+import { PRIORITY_LEVELS } from './priority';
 import { DEFAULT_WEEKLY_CAPACITY } from './roles';
 
-// ---------- Priority ----------
+// ---------- Priority ordering ----------
 
-// Impact × urgency matrix (ITIL style)
-const PRIORITY_MATRIX: Record<Impact, Record<Urgency, Priority>> = {
-  high: { high: 'P1', medium: 'P2', low: 'P3' },
-  medium: { high: 'P2', medium: 'P3', low: 'P4' },
-  low: { high: 'P3', medium: 'P4', low: 'P4' }
+export const PRIORITIES = PRIORITY_LEVELS;
+
+// Sort order: not yet prioritized first (it needs assessing), then Critical → Low
+export const priorityRank = (p: PriorityLevel | '') => (p ? PRIORITY_LEVELS.indexOf(p) + 1 : 0);
+
+// ---------- Pipeline ----------
+
+export const STATUS_STYLES: Record<RequestStatus, { label: string; badge: string }> = {
+  new: { label: 'New', badge: 'bg-purple-100 text-purple-800' },
+  assessing: { label: 'Assessing', badge: 'bg-violet-100 text-violet-800' },
+  approved: { label: 'Approved', badge: 'bg-indigo-100 text-indigo-800' },
+  planned: { label: 'Planned', badge: 'bg-sky-100 text-sky-800' },
+  committed: { label: 'Committed', badge: 'bg-blue-100 text-blue-800' },
+  'in-progress': { label: 'In progress', badge: 'bg-cyan-100 text-cyan-800' },
+  blocked: { label: 'Blocked', badge: 'bg-red-100 text-red-800' },
+  completed: { label: 'Completed', badge: 'bg-emerald-100 text-emerald-800' },
+  deferred: { label: 'Deferred', badge: 'bg-amber-100 text-amber-800' },
+  declined: { label: 'Declined', badge: 'bg-gray-200 text-gray-700' },
+  cancelled: { label: 'Cancelled', badge: 'bg-gray-100 text-gray-600' }
 };
 
-export const computePriority = (impact: Impact, urgency: Urgency): Priority =>
-  PRIORITY_MATRIX[impact][urgency];
+// The main lifecycle, in order (board columns)
+export const PIPELINE_STAGES: RequestStatus[] = ['new', 'assessing', 'approved', 'planned', 'committed', 'in-progress', 'completed'];
 
-export const PRIORITY_STYLES: Record<Priority, { label: string; badge: string; color: string }> = {
-  P1: { label: 'P1 · Critical', badge: 'bg-red-100 text-red-800', color: '#dc2626' },
-  P2: { label: 'P2 · High', badge: 'bg-orange-100 text-orange-800', color: '#ea580c' },
-  P3: { label: 'P3 · Medium', badge: 'bg-amber-100 text-amber-800', color: '#d97706' },
-  P4: { label: 'P4 · Low', badge: 'bg-gray-100 text-gray-700', color: '#6b7280' }
-};
+// Demand still being worked on or waiting for a decision
+export const OPEN_STATUSES: RequestStatus[] = ['new', 'assessing', 'approved', 'planned', 'committed', 'in-progress', 'blocked'];
 
-export const PRIORITIES: Priority[] = ['P1', 'P2', 'P3', 'P4'];
+// Waiting for assessment / prioritization
+export const INTAKE_STATUSES: RequestStatus[] = ['new', 'assessing'];
 
-// Sort order: not-yet-prioritized (awaiting triage) first, then P1 → P4
-export const priorityRank = (p: Priority | '') => (p ? PRIORITIES.indexOf(p) + 1 : 0);
+// Statuses whose planned effort counts against the owner's capacity (committed work)
+export const LOAD_STATUSES: RequestStatus[] = ['committed', 'in-progress'];
 
-// ---------- Status ----------
-
-export const STATUS_STYLES: Record<RequestStatus, { label: string; badge: string; color: string }> = {
-  submitted: { label: 'Awaiting triage', badge: 'bg-purple-100 text-purple-800', color: '#9333ea' },
-  assigned: { label: 'Assigned', badge: 'bg-blue-100 text-blue-800', color: '#2563eb' },
-  'in-progress': { label: 'In progress', badge: 'bg-cyan-100 text-cyan-800', color: '#0891b2' },
-  'on-hold': { label: 'On hold', badge: 'bg-amber-100 text-amber-800', color: '#d97706' },
-  completed: { label: 'Completed', badge: 'bg-emerald-100 text-emerald-800', color: '#059669' },
-  rejected: { label: 'Rejected', badge: 'bg-red-100 text-red-800', color: '#dc2626' },
-  cancelled: { label: 'Cancelled', badge: 'bg-gray-100 text-gray-700', color: '#6b7280' }
-};
-
-export const OPEN_STATUSES: RequestStatus[] = ['submitted', 'assigned', 'in-progress', 'on-hold'];
-
-// Statuses whose planned effort counts against the assignee's capacity
-export const LOAD_STATUSES: RequestStatus[] = ['assigned', 'in-progress'];
+// Statuses with a planned delivery date that can be missed
+export const SCHEDULED_STATUSES: RequestStatus[] = ['planned', 'committed', 'in-progress', 'blocked'];
 
 export const isOpen = (r: ServiceRequest) => OPEN_STATUSES.includes(r.status);
 
@@ -112,7 +110,7 @@ export const firestoreDate = (value: unknown): Date | null => {
 };
 
 export const isOverdue = (r: ServiceRequest, today = new Date()) =>
-  isOpen(r) && !!r.dueDate && r.dueDate < toDateKey(today);
+  SCHEDULED_STATUSES.includes(r.status) && !!r.dueDate && r.dueDate < toDateKey(today);
 
 // ---------- Capacity ----------
 

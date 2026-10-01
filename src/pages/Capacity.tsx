@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Gauge, ChevronLeft, ChevronRight, AlertTriangle, Pencil } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
+import { useVisibleRequests } from '../hooks/useVisibleRequests';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
-import { canManageCatalog, canManageRequests } from '../lib/roles';
+import { canManageCatalog, canManageRequests, usersInScope } from '../lib/roles';
 import {
   addDays,
   buildCapacity,
@@ -20,7 +21,8 @@ import {
   utilizationClass,
   weekKeys
 } from '../lib/demand';
-import { Service, ServiceRequest, User } from '../types';
+import { Service, Team, User } from '../types';
+import { renameTeam } from '../services/teamService';
 import Modal from '../components/Modal';
 import PersonCapacity from '../components/capacity/PersonCapacity';
 import RenameTeamForm from '../components/capacity/RenameTeamForm';
@@ -52,8 +54,11 @@ const Capacity = () => {
   }, [location, navigate]);
 
   const { data: users, loading: usersLoading, update: updateUser } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
-  const { data: requests, loading: requestsLoading } = useFirestore<ServiceRequest>({ collectionName: COLLECTIONS.REQUESTS });
+  const { data: requests, loading: requestsLoading } = useVisibleRequests(user);
   const { data: services, update: updateService } = useFirestore<Service>({ collectionName: COLLECTIONS.SERVICES });
+  const { data: teamDocs, add: addTeam, update: updateTeam } = useFirestore<Team>({ collectionName: COLLECTIONS.TEAMS });
+  // Leads and managers plan against their own team; admins see everyone
+  const scopedUsers = useMemo(() => usersInScope(users, user), [users, user]);
 
   const weeks = useMemo(
     () => weekKeys(addDays(startOfWeek(new Date()), weekOffset * 7), weekCount),
@@ -61,7 +66,7 @@ const Capacity = () => {
   );
   const thisWeek = toDateKey(startOfWeek(new Date()));
 
-  const rows = useMemo(() => buildCapacity(users, requests, weeks), [users, requests, weeks]);
+  const rows = useMemo(() => buildCapacity(scopedUsers, requests, weeks), [scopedUsers, requests, weeks]);
   const logged = useMemo(() => loggedByUserWeek(requests), [requests]);
 
   const teams = [...new Set(rows.map(r => r.team))].sort();
@@ -69,17 +74,20 @@ const Capacity = () => {
   const selectedRow = rows.find(r => r.userId === selectedUserId) || null;
 
   // Everyone in a team (including inactive users); "Unassigned" means no team set
-  const teamMembers = (team: string) => users.filter(u => (u.team || UNASSIGNED_TEAM) === team);
+  const teamMembers = (team: string) => users.filter(u => (team === UNASSIGNED_TEAM ? !u.teamId : u.team === team));
   const teamServices = (team: string) => (team === UNASSIGNED_TEAM ? [] : services.filter(s => s.ownerTeam === team));
 
   const handleRenameTeam = async (oldName: string, newName: string) => {
-    await Promise.all([
-      ...teamMembers(oldName).map(u => updateUser(u.id, { team: newName })),
-      ...teamServices(oldName).map(s => updateService(s.id, { ownerTeam: newName }))
-    ]);
+    await renameTeam(oldName, newName, { teams: teamDocs, users, services, canCreate: user?.role === 'admin' }, {
+      updateTeam,
+      addTeam,
+      updateUser,
+      updateService
+    });
     if (teamFilter === oldName) setTeamFilter(newName);
     setRenamingTeam(null);
   };
+
 
   const loggedFor = (row: CapacityRow, week: string) => logged.get(row.userId)?.get(week) || 0;
   const cellHours = (row: CapacityRow, week: string) => (view === 'planned' ? row.allocated[week] : loggedFor(row, week));
@@ -299,7 +307,7 @@ const Capacity = () => {
             team={renamingTeam}
             memberNames={teamMembers(renamingTeam).map(u => u.displayName || u.email || 'Unknown')}
             serviceCount={teamServices(renamingTeam).length}
-            existingTeams={[...new Set([...users.map(u => u.team), ...services.map(s => s.ownerTeam)].filter(Boolean) as string[])].sort()}
+            existingTeams={teamDocs.map(t => t.name).sort()}
             onSubmit={newName => handleRenameTeam(renamingTeam, newName)}
             onCancel={() => setRenamingTeam(null)}
           />

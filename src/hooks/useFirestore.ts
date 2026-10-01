@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   DocumentData,
+  QueryCompositeFilterConstraint,
   QueryConstraint,
   Timestamp,
   orderBy
@@ -18,9 +19,18 @@ import { db } from '../lib/firebase';
 
 interface UseFirestoreOptions {
   collectionName: string;
+  // Extra constraints (e.g. where clauses). Memoize the array: a new array on every render refetches.
   queries?: QueryConstraint[];
+  // An or()/and() filter. Like `queries`, keep the same object between renders (useMemo).
+  filter?: QueryCompositeFilterConstraint;
   limit?: number;
+  // Newest first by createdAt. Turn off for filtered queries that shouldn't need a composite index.
+  orderByCreated?: boolean;
+  // Skip fetching until true (e.g. until the signed-in user is known)
+  enabled?: boolean;
 }
+
+const NO_QUERIES: QueryConstraint[] = [];
 
 interface BaseDocument {
   id: string;
@@ -29,27 +39,30 @@ interface BaseDocument {
 
 export function useFirestore<T extends DocumentData>({ 
   collectionName,
-  queries = [],
-  limit
+  queries = NO_QUERIES,
+  filter,
+  limit,
+  orderByCreated = true,
+  enabled = true
 }: UseFirestoreOptions) {
   const [data, setData] = useState<(T & BaseDocument)[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let mounted = true;
+    if (!enabled) return;
 
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Create base query with default ordering
-        const baseQuery = query(
-          collection(db, collectionName),
-          orderBy('createdAt', 'desc'),
-          ...queries
-        );
+        const ordering = orderByCreated ? [orderBy('createdAt', 'desc')] : [];
+        const baseQuery = filter
+          ? query(collection(db, collectionName), filter, ...ordering)
+          : query(collection(db, collectionName), ...ordering, ...queries);
         
         const querySnapshot = await getDocs(baseQuery);
         
@@ -80,7 +93,10 @@ export function useFirestore<T extends DocumentData>({
     return () => {
       mounted = false;
     };
-  }, [collectionName, limit, ...queries]);
+  }, [collectionName, limit, queries, filter, orderByCreated, enabled, version]);
+
+  // Refetch, e.g. after a write made outside this hook
+  const reload = () => setVersion(v => v + 1);
 
   // Pass `id` to use it as the document ID; otherwise Firestore generates one
   const add = async (data: Omit<T, keyof BaseDocument>, id?: string) => {
@@ -158,6 +174,7 @@ export function useFirestore<T extends DocumentData>({
     error,
     add,
     update,
-    remove
+    remove,
+    reload
   };
 }

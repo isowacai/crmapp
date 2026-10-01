@@ -7,8 +7,8 @@ export const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#
 // Neutral for "Other" / "Not set"
 export const NEUTRAL = '#a3a29b';
 
-// Ordinal blue ramp for P1 (darkest) → P4 (lightest)
-export const PRIORITY_RAMP = { P1: '#104281', P2: '#256abf', P3: '#5598e7', P4: '#86b6ef' } as const;
+// Ordinal blue ramp for Critical (darkest) → Low (lightest)
+export const PRIORITY_RAMP = { critical: '#104281', high: '#256abf', medium: '#5598e7', low: '#86b6ef' } as const;
 
 // Reserved status colours; always paired with an icon or label
 export const STATUS = { good: '#0ca30c', warning: '#fab219', critical: '#d03b3b' } as const;

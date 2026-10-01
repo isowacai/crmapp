@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase Admin SDK service-account keys (never commit)
+config/serviceAccountKey.json
+*serviceAccount*.json
+
+# Firebase emulator logs
+firestore-debug.log
+firebase-debug.log

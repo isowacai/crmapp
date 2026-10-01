@@ -5,7 +5,7 @@ import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../contexts/AuthContext';
 import { COLLECTIONS } from '../lib/firebase';
 import { canManageCatalog } from '../lib/roles';
-import { Service, User } from '../types';
+import { Service, Team } from '../types';
 import Modal from '../components/Modal';
 
 type ServiceFormData = Omit<Service, 'id'>;
@@ -14,6 +14,7 @@ const emptyService: ServiceFormData = {
   name: '',
   category: '',
   description: '',
+  teamId: '',
   ownerTeam: '',
   active: true
 };
@@ -30,7 +31,7 @@ const ServiceForm = ({
 }: {
   initialData: ServiceFormData;
   categories: string[];
-  teams: string[];
+  teams: Team[]; // teams this user may assign services to
   onSubmit: (data: ServiceFormData) => void;
   onCancel: () => void;
 }) => {
@@ -61,16 +62,19 @@ const ServiceForm = ({
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Delivering team</label>
-          <input
+          <select
             className={inputClass}
-            value={form.ownerTeam}
-            onChange={e => set('ownerTeam', e.target.value)}
-            list="service-teams"
+            value={form.teamId}
+            onChange={e => {
+              const team = teams.find(t => t.id === e.target.value);
+              setForm(prev => ({ ...prev, teamId: e.target.value, ownerTeam: team?.name ?? '' }));
+            }}
             required
-          />
-          <datalist id="service-teams">
-            {teams.map(t => <option key={t} value={t} />)}
-          </datalist>
+          >
+            <option value="">Select a team</option>
+            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">Requests for this service go to this team to assess and deliver.</p>
         </div>
       </div>
       <div>
@@ -104,7 +108,7 @@ const ServiceCatalog = () => {
 
   const { data: services, loading, error, add, update } = useFirestore<Service>({ collectionName: COLLECTIONS.SERVICES });
   const { data: categoryDocs } = useFirestore<{ name: string }>({ collectionName: COLLECTIONS.CATEGORIES });
-  const { data: users } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
+  const { data: teams } = useFirestore<Team>({ collectionName: COLLECTIONS.TEAMS });
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -113,9 +117,12 @@ const ServiceCatalog = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const categories = useMemo(() => categoryDocs.map(c => c.name).sort(), [categoryDocs]);
-  const teams = useMemo(
-    () => [...new Set([...users.map(u => u.team), ...services.map(s => s.ownerTeam)].filter(Boolean) as string[])].sort(),
-    [users, services]
+  // Admins manage every team's services; managers only their own team's (enforced by the rules too)
+  const isAdmin = user?.role === 'admin';
+  const canEdit = (service: Pick<Service, 'teamId'>) => isCatalogManager && (isAdmin || (!!user?.teamId && service.teamId === user.teamId));
+  const editableTeams = useMemo(
+    () => teams.filter(t => isAdmin || t.id === user?.teamId).sort((a, b) => a.name.localeCompare(b.name)),
+    [teams, isAdmin, user?.teamId]
   );
 
   const visible = services
@@ -159,7 +166,7 @@ const ServiceCatalog = () => {
             <p className="text-gray-500 text-sm">Choose a service to raise a request</p>
           </div>
         </div>
-        {isCatalogManager && (
+        {isCatalogManager && editableTeams.length > 0 && (
           <button onClick={() => setIsAddOpen(true)} className="btn-primary flex items-center gap-2">
             <Plus size={20} /> Add service
           </button>
@@ -225,7 +232,7 @@ const ServiceCatalog = () => {
                     <Send size={16} /> Request
                   </button>
                 )}
-                {isCatalogManager && (
+                {canEdit(service) && (
                   <button onClick={() => setEditing(service)} className="btn-icon text-amber-600 border border-gray-200" title="Edit service">
                     <Pencil size={18} />
                   </button>
@@ -246,11 +253,12 @@ const ServiceCatalog = () => {
               name: editing.name,
               category: editing.category,
               description: editing.description,
+              teamId: editing.teamId ?? '',
               ownerTeam: editing.ownerTeam,
               active: editing.active
             } : emptyService}
             categories={categories}
-            teams={teams}
+            teams={editableTeams}
             onSubmit={handleSave}
             onCancel={() => { setIsAddOpen(false); setEditing(null); }}
           />

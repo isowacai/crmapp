@@ -5,7 +5,7 @@ import ServiceCatalog from './pages/ServiceCatalog';
 import Requests from './pages/Requests';
 import Capacity from './pages/Capacity';
 import Categories from './pages/Categories';
-import Tasks from './pages/Tasks';
+import Workspace from './pages/Workspace';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
@@ -54,7 +54,7 @@ function App() {
               <Route path="/requests" element={<Requests />} />
               <Route path="/capacity" element={<Capacity />} />
               <Route path="/categories" element={<Categories />} />
-              <Route path="/tasks" element={<Tasks />} />
+              <Route path="/workspace" element={<Workspace />} />
               <Route path="/users" element={<Users />} />
               <Route path="/profile" element={<Profile />} />
             </Route>

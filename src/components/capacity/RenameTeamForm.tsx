@@ -12,6 +12,7 @@ const RenameTeamForm = ({
   onSubmit,
   onCancel
 }: {
+  // Renaming a real team onto another team's name isn't allowed (its demand would need moving)
   team: string;
   memberNames: string[];
   serviceCount: number;
@@ -26,6 +27,7 @@ const RenameTeamForm = ({
 
   const trimmed = name.trim();
   const mergesInto = existingTeams.find(t => t !== team && t.toLowerCase() === trimmed.toLowerCase());
+  const mergeBlocked = !!mergesInto && !isUnassigned;
   const unchanged = trimmed === team;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,8 +79,11 @@ const RenameTeamForm = ({
             It will also update <strong>{serviceCount}</strong> catalog {serviceCount === 1 ? 'service' : 'services'} delivered by {team}.
           </p>
         )}
-        {mergesInto && (
+        {mergesInto && !mergeBlocked && (
           <p className="text-amber-700">"{mergesInto}" already exists, so these people will join that team.</p>
+        )}
+        {mergeBlocked && (
+          <p className="text-red-700">"{mergesInto}" is another team. Choose a different name; to combine teams, move people and services individually.</p>
         )}
       </div>
 
@@ -88,7 +93,7 @@ const RenameTeamForm = ({
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
           Cancel
         </button>
-        <button type="submit" className="btn-primary disabled:opacity-60" disabled={submitting || !trimmed || unchanged}>
+        <button type="submit" className="btn-primary disabled:opacity-60" disabled={submitting || !trimmed || unchanged || mergeBlocked}>
           {submitting ? 'Saving…' : mergesInto ? 'Move to team' : isUnassigned ? 'Assign team' : 'Rename team'}
         </button>
       </div>

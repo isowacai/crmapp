@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, ClipboardList, Gauge, Package, CheckSquare, LogOut, User, Shield, Tags } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, ClipboardList, Gauge, Settings2, Package, LogOut, User, Shield, Tags } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { canManageCatalog, canManageRequests } from '../lib/roles';
 
@@ -11,10 +11,10 @@ const Sidebar = () => {
   const links = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/services', icon: LayoutGrid, label: 'Service Catalog' },
-    { to: '/requests', icon: ClipboardList, label: 'Service Requests' },
+    { to: '/requests', icon: ClipboardList, label: 'Demand' },
     { to: '/capacity', icon: Gauge, label: 'Capacity', leadAccess: true },
+    { to: '/workspace', icon: Settings2, label: 'Workspace', leadAccess: true },
     { to: '/categories', icon: Tags, label: 'Categories', managerAccess: true },
-    { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { to: '/users', icon: Shield, label: 'Users', adminOnly: true },
   ];
 
