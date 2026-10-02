@@ -1,0 +1,3 @@
+# Netlify: serve the app for every path so its own routes (e.g. /requests) work on refresh and direct links.
+# Real files (assets, config.js) are still served as-is.
+/*    /index.html   200
