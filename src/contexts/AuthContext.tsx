@@ -24,7 +24,7 @@ interface AuthContextType {
     password: string,
     displayName?: string,
     role?: UserRole,
-    profile?: { teamId?: string; team?: string; weeklyCapacityHours?: number }
+    profile?: { teamId?: string; team?: string; weeklyCapacityHours?: number; firstName?: string; lastName?: string }
   ) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     displayName?: string,
     role: UserRole = 'staff',
-    profile: { teamId?: string; team?: string; weeklyCapacityHours?: number } = {}
+    profile: { teamId?: string; team?: string; weeklyCapacityHours?: number; firstName?: string; lastName?: string } = {}
   ) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -105,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email,
         displayName: displayName || email.split('@')[0],
+        ...(profile.firstName !== undefined ? { firstName: profile.firstName, lastName: profile.lastName ?? '' } : {}),
         role,
         teamId: profile.teamId || '',
         team: profile.team || '',

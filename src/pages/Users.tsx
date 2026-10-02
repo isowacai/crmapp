@@ -6,37 +6,34 @@ import { Users as UsersIcon, UserPlus, Eye, Pencil, Trash2, X, Shield, Search, F
 import Modal from '../components/Modal';
 import { Navigate } from 'react-router-dom';
 import { COLLECTIONS } from '../lib/firebase';
-import { DEFAULT_WEEKLY_CAPACITY, normalizeRole, ROLE_LABELS } from '../lib/roles';
+import { normalizeRole, ROLE_LABELS } from '../lib/roles';
+import { fullName, nameParts } from '../lib/names';
 
 interface UserFormData {
   email: string;
   password: string;
-  displayName: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
-  teamId: string;
-  weeklyCapacityHours: number;
 }
 
 const UserForm = memo(({
   onSubmit,
   onCancel,
   initialData,
-  isAdd = true,
-  teams
+  isAdd = true
 }: {
   onSubmit: (data: UserFormData) => void;
   onCancel: () => void;
   initialData?: Partial<UserFormData>;
   isAdd?: boolean;
-  teams: Team[];
 }) => {
   const [formData, setFormData] = useState<UserFormData>({
     email: initialData?.email || '',
     password: '',
-    displayName: initialData?.displayName || '',
-    role: initialData?.role || 'staff',
-    teamId: initialData?.teamId || '',
-    weeklyCapacityHours: initialData?.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY
+    firstName: initialData?.firstName || '',
+    lastName: initialData?.lastName || '',
+    role: initialData?.role || 'staff'
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -74,15 +71,29 @@ const UserForm = memo(({
           />
         </div>
       )}
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Display Name</label>
-        <input
-          type="text"
-          value={formData.displayName}
-          onChange={(e) => handleChange('displayName', e.target.value)}
-          className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          required
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">First name</label>
+          <input
+            type="text"
+            value={formData.firstName}
+            onChange={(e) => handleChange('firstName', e.target.value)}
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            autoComplete="given-name"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Last name</label>
+          <input
+            type="text"
+            value={formData.lastName}
+            onChange={(e) => handleChange('lastName', e.target.value)}
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            autoComplete="family-name"
+            required
+          />
+        </div>
       </div>
       {isAdd ? (
         <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
@@ -104,32 +115,7 @@ const UserForm = memo(({
         <p className="mt-1 text-xs text-gray-500">Leads and managers can triage and assign requests; admins also manage the catalog and users.</p>
       </div>
       )}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Team</label>
-          <select
-            value={formData.teamId}
-            onChange={(e) => handleChange('teamId', e.target.value)}
-            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">No team</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Capacity (hours/week)</label>
-          <input
-            type="number"
-            min={0}
-            max={80}
-            step={0.5}
-            value={formData.weeklyCapacityHours}
-            onChange={(e) => handleChange('weeklyCapacityHours', Number(e.target.value))}
-            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            required
-          />
-        </div>
-      </div>
+      <p className="text-xs text-gray-500">Team, weekly hours, and hourly rate are managed on the Team page.</p>
       <div className="flex justify-end gap-3 pt-4">
         <button
           type="button"
@@ -224,20 +210,18 @@ const Users = () => {
       
       if (isAddOpen) {
         // Security rules only allow new accounts to start as staff
-        await signUp(formData.email, formData.password, formData.displayName, 'staff', {
-          teamId: formData.teamId,
-          team: teamName(formData.teamId),
-          weeklyCapacityHours: formData.weeklyCapacityHours
+        await signUp(formData.email, formData.password, fullName(formData.firstName, formData.lastName), 'staff', {
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim()
         });
         setIsAddOpen(false);
       } else if (isEditOpen && selectedUser) {
         await updateUserRole(selectedUser.id, formData.role);
         await update(selectedUser.id, {
-          displayName: formData.displayName,
-          role: formData.role,
-          teamId: formData.teamId,
-          team: teamName(formData.teamId),
-          weeklyCapacityHours: formData.weeklyCapacityHours
+          displayName: fullName(formData.firstName, formData.lastName),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          role: formData.role
         });
         setIsEditOpen(false);
       }
@@ -396,8 +380,7 @@ const Users = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
-                    <div>{user.team || '—'}</div>
-                    <div className="text-xs text-gray-500">{user.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY}h / week</div>
+                    {(user.teamId && teamName(user.teamId)) || user.team || '—'}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -534,14 +517,11 @@ const Users = () => {
               }}
               initialData={selectedUser ? {
                 email: selectedUser.email || '',
-                displayName: selectedUser.displayName,
+                ...nameParts(selectedUser),
                 role: normalizeRole(selectedUser.role),
-                teamId: selectedUser.teamId || '',
-                weeklyCapacityHours: selectedUser.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY,
                 password: '' // Add empty password for the form
               } : undefined}
               isAdd={isAddOpen}
-              teams={teams}
             />
           </div>
         </div>
@@ -568,7 +548,7 @@ const Users = () => {
             </div>
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-500">Display Name</label>
+                <label className="block text-sm font-medium text-gray-500">Name</label>
                 <p className="mt-1 text-lg font-medium">{selectedUser.displayName}</p>
               </div>
               <div>
@@ -590,11 +570,7 @@ const Users = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Team</label>
-                <p className="mt-1 text-lg font-medium">{selectedUser.team || '—'}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Capacity</label>
-                <p className="mt-1 text-lg font-medium">{selectedUser.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY} hours / week</p>
+                <p className="mt-1 text-lg font-medium">{(selectedUser.teamId && teamName(selectedUser.teamId)) || selectedUser.team || '—'}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Status</label>

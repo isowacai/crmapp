@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { AssessmentCriterion, AssessmentDecision, PriorityThresholds, ServiceRequest } from '../../types';
+import { AssessmentCriterion, AssessmentDecision, PriorityThresholds, ServiceRequest, User } from '../../types';
+import { decisionWindow } from '../../lib/forecast';
+import CapacityCheck from '../capacity/CapacityCheck';
 import { activeCriteria, calculateScore, levelForScore, normalizedWeights, PRIORITY_STYLES } from '../../lib/priority';
 import { AssessInput } from '../../services/requestCommands';
+import { formatMoney, MONTHS_PER_YEAR } from '../../lib/value';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500';
@@ -18,12 +21,24 @@ const AssessmentForm = ({
   request,
   criteria,
   thresholds,
+  teamUsers,
+  requests,
+  initialDecision = 'accept',
+  allowMoreInfo = true,
+  hourValue = null,
+  currency = 'USD',
   onSubmit,
   onCancel
 }: {
   request: ServiceRequest;
   criteria: AssessmentCriterion[];
   thresholds: PriorityThresholds;
+  teamUsers: User[];
+  requests: ServiceRequest[];
+  initialDecision?: AssessmentDecision;
+  allowMoreInfo?: boolean; // false when the team doesn't use the Assessing stage
+  hourValue?: number | null; // value of an hour saved, to show the expected benefit in money
+  currency?: string;
   onSubmit: (input: AssessInput) => Promise<void>;
   onCancel: () => void;
 }) => {
@@ -38,8 +53,10 @@ const AssessmentForm = ({
   const [estimatedHours, setEstimatedHours] = useState(request.estimatedHours || previous?.estimatedHours || 0);
   const [dependencies, setDependencies] = useState(previous?.dependencies ?? '');
   const [comments, setComments] = useState('');
-  const [decision, setDecision] = useState<AssessmentDecision>('accept');
+  const [decision, setDecision] = useState<AssessmentDecision>(initialDecision);
   const [revisitOn, setRevisitOn] = useState('');
+  const [hoursSaved, setHoursSaved] = useState(request.expectedBenefit?.hoursSavedPerMonth ?? 0);
+  const [benefitNote, setBenefitNote] = useState(request.expectedBenefit?.description ?? '');
   const [submitting, setSubmitting] = useState(false);
 
   const score = calculateScore(scores, active);
@@ -49,7 +66,15 @@ const AssessmentForm = ({
     e.preventDefault();
     setSubmitting(true);
     try {
-      await onSubmit({ scores, estimatedHours, dependencies, comments, decision, revisitOn });
+      await onSubmit({
+        scores,
+        estimatedHours,
+        dependencies,
+        comments,
+        decision,
+        revisitOn,
+        expectedBenefit: { hoursSavedPerMonth: hoursSaved || 0, description: benefitNote }
+      });
     } finally {
       setSubmitting(false);
     }
@@ -138,6 +163,20 @@ const AssessmentForm = ({
           <p className="mt-2 text-sm text-gray-900">{request.neededBy || 'No date requested'}</p>
         </div>
       </div>
+      {estimatedHours > 0 && (() => {
+        const window = decisionWindow(request);
+        return (
+          <CapacityCheck
+            request={request}
+            effort={estimatedHours}
+            start={window.start}
+            end={window.end}
+            basis={window.basis}
+            teamUsers={teamUsers}
+            requests={requests}
+          />
+        );
+      })()}
       <div>
         <label className="block text-sm font-medium text-gray-700">Dependencies (optional)</label>
         <input
@@ -148,10 +187,34 @@ const AssessmentForm = ({
         />
       </div>
 
+      <fieldset className="p-3 rounded-lg border border-emerald-100 bg-emerald-50/40">
+        <legend className="px-1 text-sm font-medium text-gray-700">Expected benefit (optional)</legend>
+        <p className="text-xs text-gray-500 mb-2">
+          Business hours this work should save each month once delivered. Confirmed in the outcome after completion, and turned into
+          cost avoidance on the dashboard.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-3">
+          <label className="text-xs text-gray-600">
+            Hours saved per month
+            <input type="number" min={0} step={0.5} className={inputClass} value={hoursSaved || ''} onChange={e => setHoursSaved(Number(e.target.value))} />
+          </label>
+          <label className="text-xs text-gray-600">
+            What will it save?
+            <input className={inputClass} value={benefitNote} onChange={e => setBenefitNote(e.target.value)} placeholder="e.g. No more manual weekend deployments" />
+          </label>
+        </div>
+        {hoursSaved > 0 && hourValue !== null && (
+          <p className="mt-2 text-xs text-emerald-800">
+            ≈ {formatMoney(hoursSaved * MONTHS_PER_YEAR * hourValue, currency)} a year in cost avoidance ({hoursSaved} h × {MONTHS_PER_YEAR} months ×{' '}
+            {formatMoney(hourValue, currency)}/h)
+          </p>
+        )}
+      </fieldset>
+
       <fieldset>
         <legend className="block text-sm font-medium text-gray-700 mb-2">Decision</legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {DECISIONS.map(d => (
+          {DECISIONS.filter(d => allowMoreInfo || d.value !== 'more-info').map(d => (
             <label
               key={d.value}
               className={`flex gap-2 p-3 rounded-lg border cursor-pointer ${decision === d.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}

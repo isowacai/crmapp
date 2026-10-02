@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useWorkCalendar } from '../../hooks/useWorkCalendar';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { ServiceRequest } from '../../types';
@@ -42,6 +43,7 @@ const TeamCapacity = ({
   const [filter, setFilter] = useState<RequestFilter>('open');
 
   const weekSet = useMemo(() => new Set(weeks), [weeks]);
+  const calendar = useWorkCalendar();
   const memberIds = useMemo(() => new Set(members.map(m => m.userId)), [members]);
   const loggedFor = (userId: string, week: string) => logged.get(userId)?.get(week) || 0;
 
@@ -60,7 +62,7 @@ const TeamCapacity = ({
         .filter(r => memberIds.has(r.assigneeId))
         .map(r => ({
           request: r,
-          plannedInPeriod: plannedInWeeks(r, weekSet),
+          plannedInPeriod: plannedInWeeks(r, weekSet, calendar),
           loggedInPeriod: loggedOn(r, { byIds: memberIds, weeks: weekSet })
         }))
         .sort((a, b) => compareByUrgency(a.request, b.request)),

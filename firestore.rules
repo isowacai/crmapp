@@ -65,8 +65,15 @@ service cloud.firestore {
       allow update: if isAdmin()
         // Anyone can change their own display name
         || (request.auth.uid == uid && onlyChanges(['displayName', 'lastLogin', 'updatedAt']))
-        // Managers can rename teams and give people without a team a team
-        || (isCatalogManager() && onlyChanges(['team', 'teamId', 'updatedAt']));
+        // On the Team page a manager adds people who have no team to their own team, removes their own
+        // members, and sets their weekly hours and rate; they can't take people from another team
+        || (isCatalogManager() && myTeamId() != ''
+            && resource.data.get('teamId', '') in ['', myTeamId()]
+            && request.resource.data.get('teamId', '') in ['', myTeamId()]
+            && onlyChanges(['team', 'teamId', 'weeklyCapacityHours', 'hourlyRate', 'updatedAt']))
+        // A team's leads set their own members' weekly hours and rate
+        || (isRequestManager() && myTeamId() != '' && resource.data.get('teamId', '') == myTeamId()
+            && onlyChanges(['weeklyCapacityHours', 'hourlyRate', 'updatedAt']));
 
       allow delete: if isAdmin();
     }
@@ -87,15 +94,35 @@ service cloud.firestore {
       allow write: if isCatalogManager();
     }
 
+    // A service can be delivered by several teams (teamIds), each separately. Services saved before
+    // that have a single teamId instead.
+    function deliveringTeams(data) {
+      return data.get('teamIds', data.get('teamId', '') == '' ? [] : [data.teamId]);
+    }
+
     match /services/{id} {
       allow read: if signedIn();
-      // Managers maintain their own team's services; admins any team's
+
+      // The delivering teams other than the manager's own are left exactly as they were
+      function onlyOwnTeamChanged() {
+        let mine = [myTeamId()].toSet();
+        return deliveringTeams(request.resource.data).toSet().difference(mine) == deliveringTeams(resource.data).toSet().difference(mine);
+      }
+
+      // Managers add services delivered by their own team; admins any
       allow create: if isAdmin()
-        || (isCatalogManager() && request.resource.data.teamId == myTeamId() && myTeamId() != '');
+        || (isCatalogManager() && myTeamId() != '' && request.resource.data.teamIds == [myTeamId()]);
       allow update: if isAdmin()
+        // A delivering team's manager maintains the shared description and questions, and can stop
+        // delivering it, but can't add or remove other teams
         || (isCatalogManager() && myTeamId() != ''
-            && resource.data.teamId == myTeamId()
-            && request.resource.data.teamId == myTeamId());
+            && myTeamId() in deliveringTeams(resource.data)
+            && onlyOwnTeamChanged())
+        // Any manager can start delivering a service too ("Also deliver this")
+        || (isCatalogManager() && myTeamId() != ''
+            && onlyChanges(['teamIds', 'teamId', 'ownerTeam'])
+            && myTeamId() in deliveringTeams(request.resource.data)
+            && onlyOwnTeamChanged());
       allow delete: if isAdmin();
     }
 
@@ -131,20 +158,51 @@ service cloud.firestore {
           && after[before.size()].byId == request.auth.uid;
       }
 
+      // Leads of the team that owns the original see the supporting requests raised under it
+      function managesParent() {
+        return managesTeam(resource.data.get('parentTeamId', ''));
+      }
+
       // `resource == null` lets anyone check whether a request number is free
-      allow get: if signedIn() && (resource == null || managesTeam(resource.data.teamId) || isRequester() || isAssignee());
+      allow get: if signedIn() && (resource == null || managesTeam(resource.data.teamId) || managesParent() || isRequester() || isAssignee());
 
       // Queries must be limited to demand the user may see: their team's (leads/managers),
       // or what they raised or own
       allow list: if signedIn() && (
         managesTeam(resource.data.teamId)
+        || managesParent()
         || resource.data.requesterId == request.auth.uid
         || resource.data.assigneeId == request.auth.uid
       );
 
-      // New demand arrives unassessed, raised by the signed-in user, owned by the service's team,
-      // with the request number as the ID
+      // A supporting request must be raised by a lead/manager of the original's team, pointing at a real original
+      function validParentLink() {
+        let parentId = request.resource.data.get('parentId', '');
+        return parentId == ''
+          || (managesTeam(request.resource.data.parentTeamId)
+              && get(/databases/$(database)/documents/requests/$(parentId)).data.teamId == request.resource.data.parentTeamId);
+      }
+
+      // The service's team may limit who can request its services; its own members and supporting
+      // requests raised by another team's managers are always allowed
+      function requestAllowed() {
+        let teamId = request.resource.data.teamId;
+        let teamPath = /databases/$(database)/documents/teams/$(teamId);
+        let access = exists(teamPath) ? get(teamPath).data.get('requestAccess', { 'mode': 'everyone', 'teamIds': [] }) : { 'mode': 'everyone', 'teamIds': [] };
+        return access.mode == 'everyone'
+          || myTeamId() == teamId
+          || (myTeamId() != '' && myTeamId() in access.teamIds)
+          || request.resource.data.get('parentId', '') != '';
+      }
+
+      // New demand arrives unassessed, raised by the signed-in user, owned by one of the teams that
+      // deliver the service, with the request number as the ID
       allow create: if signedIn()
+        && requestAllowed()
+        && validParentLink()
+        && request.resource.data.get('milestones', []).size() == 0
+        && request.resource.data.get('blockers', []).size() == 0
+        && request.resource.data.get('progress', 0) == 0
         && request.resource.data.requesterId == request.auth.uid
         && request.resource.data.requestNumber == id
         && request.resource.data.status == 'new'
@@ -154,17 +212,20 @@ service cloud.firestore {
         && request.resource.data.assessments.size() == 0
         && request.resource.data.estimatedHours == 0
         && request.resource.data.loggedHours == 0
-        && request.resource.data.teamId == get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.teamId
+        && request.resource.data.teamId != ''
+        && request.resource.data.teamId in deliveringTeams(get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data)
         && request.resource.data.history.size() == 1
         && request.resource.data.history[0].byId == request.auth.uid;
 
       allow update: if signedIn() && appendsOwnHistoryEntry() && (
-        // The owning team's leads/managers manage it, but can't move it to another team
+        // The owning team's leads/managers manage it, but can't move it to another team or re-link it
         (managesTeam(resource.data.teamId)
-          && (isAdmin() || request.resource.data.teamId == resource.data.teamId))
-        // The delivery owner works it: start, block, unblock, log hours, complete, comment
+          && (isAdmin() || (request.resource.data.teamId == resource.data.teamId
+              && request.resource.data.get('parentId', '') == resource.data.get('parentId', '')
+              && request.resource.data.get('parentTeamId', '') == resource.data.get('parentTeamId', ''))))
+        // The delivery owner works it: start, block, unblock, progress, milestones, log hours, complete, comment
         || (isAssignee()
-            && onlyChanges(['status', 'loggedHours', 'completedAt', 'history', 'updatedAt'])
+            && onlyChanges(['status', 'loggedHours', 'completedAt', 'history', 'updatedAt', 'actualStart', 'progress', 'milestones', 'blockers'])
             && request.resource.data.status in ['committed', 'in-progress', 'blocked', 'completed']
             && request.resource.data.loggedHours >= resource.data.loggedHours)
         // The requester can comment (e.g. answer a request for information), or cancel open demand

@@ -8,14 +8,18 @@ import { COLLECTIONS } from '../lib/firebase';
 import { canManageRequests, DEFAULT_WEEKLY_CAPACITY } from '../lib/roles';
 import { formatHours, INTAKE_STATUSES, isOpen, isOverdue, PRIORITIES, STATUS_STYLES } from '../lib/demand';
 import { PRIORITY_STYLES } from '../lib/priority';
-import { activeFilterCount, DEFAULT_FILTERS, DemandFilters, DemandScope, filterDemand } from '../lib/demandFilters';
+import { activeFilterCount, DEFAULT_FILTERS, DemandFilters, DemandScope, filterDemand, inViewerTeam } from '../lib/demandFilters';
 import { PriorityLevel, RequestStatus, Service, Team, User } from '../types';
 import Modal from '../components/Modal';
 import { PriorityBadge, StatusBadge } from '../components/RequestBadges';
 import NewRequestForm, { NewRequestData } from '../components/requests/NewRequestForm';
 import RequestDetails, { RequestChange } from '../components/requests/RequestDetails';
 import PipelineBoard from '../components/demand/PipelineBoard';
-import { createRequest } from '../services/requestCommands';
+import { BoardKey, BOARDS, boardCounts } from '../lib/boards';
+import { createRequest, createSupportingRequest, noteSupportingRequest } from '../services/requestCommands';
+import { canRequest, workflowOf } from '../lib/workspace';
+import { allLinesOfBusiness, deliveringTeamIds, routeRequest } from '../lib/catalog';
+import { SupportingRequestInput } from '../components/requests/DeliveryPanel';
 import { createNumberedRequest } from '../services/requestRepository';
 
 type View = 'board' | 'list';
@@ -40,11 +44,26 @@ const Requests = () => {
   const { data: requests, loading, error, update, reload } = useVisibleRequests(user);
   const { data: services } = useFirestore<Service>({ collectionName: COLLECTIONS.SERVICES });
   const { data: users } = useFirestore<User>({ collectionName: COLLECTIONS.USERS });
-  const { data: teams } = useFirestore<Team>({ collectionName: COLLECTIONS.TEAMS, enabled: isManager });
+  const { data: teams } = useFirestore<Team>({ collectionName: COLLECTIONS.TEAMS });
 
   const [view, setViewState] = useState<View>(readView);
   const [filters, setFilters] = useState<DemandFilters>({ ...DEFAULT_FILTERS, scope: isManager ? 'team' : 'mine' });
-  const [showClosed, setShowClosed] = useState(false);
+  const [board, setBoardState] = useState<BoardKey>(() => {
+    try {
+      const saved = localStorage.getItem('demand.board');
+      return saved === 'delivery' || saved === 'closed' ? saved : 'intake';
+    } catch {
+      return 'intake';
+    }
+  });
+  const setBoard = (b: BoardKey) => {
+    setBoardState(b);
+    try {
+      localStorage.setItem('demand.board', b);
+    } catch {
+      // Remembering the board is optional
+    }
+  };
   const [newServiceId, setNewServiceId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -70,10 +89,22 @@ const Requests = () => {
     }
   }, [location, navigate]);
 
+  // Services that can take requests: active and delivered by at least one team. Requesters pick a
+  // service and a line of business; the app routes the request to the right team (routeRequest).
   const activeServices = useMemo(
-    () => services.filter(s => s.active).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
+    () =>
+      services
+        .filter(s => s.active && deliveringTeamIds(s).length > 0)
+        .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)),
     [services]
   );
+  const linesOfBusiness = useMemo(() => allLinesOfBusiness(teams), [teams]);
+  // Supporting requests per original, from everything the viewer can see (they sit on other teams' boards)
+  const supportingCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of requests) if (r.parentId) counts.set(r.parentId, (counts.get(r.parentId) ?? 0) + 1);
+    return counts;
+  }, [requests]);
   const weeklyCapacityByUser = useMemo(
     () => new Map(users.map(u => [u.id, u.weeklyCapacityHours ?? DEFAULT_WEEKLY_CAPACITY])),
     [users]
@@ -81,17 +112,25 @@ const Requests = () => {
 
   if (!user) return null;
 
-  const visible = filterDemand(requests, filters, user.id, { ignoreStatus: view === 'board' });
+  // Stages the viewer's team doesn't use (admins see every stage)
+  const myWorkflow = workflowOf(teams.find(t => t.id === user.teamId));
+  const hiddenStages: RequestStatus[] =
+    user.role === 'admin' ? [] : [...(myWorkflow.useAssessing ? [] : ['assessing' as const]), ...(myWorkflow.usePlanned ? [] : ['planned' as const])];
+  const visible = filterDemand(requests, filters, user.id, {
+    ignoreStatus: view === 'board',
+    teamId: user.role === 'admin' ? undefined : user.teamId || ''
+  });
+  const counts = boardCounts(visible);
   const selected = requests.find(r => r.id === selectedId) || null;
 
   const scopes: { id: DemandScope; label: string; count: number }[] = [
     ...(isManager
-      ? [{ id: 'team' as DemandScope, label: user.role === 'admin' ? 'All demand' : 'Team demand', count: requests.filter(isOpen).length }]
+      ? [{ id: 'team' as DemandScope, label: user.role === 'admin' ? 'All demand' : 'Team demand', count: requests.filter(r => isOpen(r) && inViewerTeam(r, user)).length }]
       : []),
     { id: 'mine', label: 'Raised by me', count: requests.filter(r => r.requesterId === user.id && isOpen(r)).length },
     { id: 'assigned', label: 'Assigned to me', count: requests.filter(r => r.assigneeId === user.id && isOpen(r)).length }
   ];
-  const needsAssessment = requests.filter(r => INTAKE_STATUSES.includes(r.status)).length;
+  const needsAssessment = requests.filter(r => INTAKE_STATUSES.includes(r.status) && inViewerTeam(r, user)).length;
 
   // People who appear on visible demand, for the owner/requester filters
   const owners = [...new Map(requests.filter(r => r.assigneeId).map(r => [r.assigneeId, r.assigneeName])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
@@ -102,9 +141,11 @@ const Requests = () => {
       setSaveError(null);
       const service = services.find(s => s.id === data.serviceId);
       if (!service) throw new Error('Please choose a service');
+      const team = routeRequest(service, data.lineOfBusiness, teams);
+      if (team && !canRequest(team, user.teamId)) throw new Error(`${team.name} only accepts ${service.name} requests from selected teams.`);
 
       const created = await createNumberedRequest(
-        requestNumber => createRequest(data, service, user, requestNumber),
+        requestNumber => createRequest(data, service, team, user, requestNumber),
         requests.map(r => r.requestNumber)
       );
       reload();
@@ -114,6 +155,34 @@ const Requests = () => {
       setSaveError(err instanceof Error ? err.message : 'Could not submit the request');
       throw err;
     }
+  };
+
+  // A request for another team's service, raised as part of the selected request
+  const handleCreateSupporting = async (input: SupportingRequestInput) => {
+    if (!selected) return;
+    const service = services.find(s => s.id === input.serviceId);
+    if (!service) throw new Error('Please choose a service');
+    // Same line of business as the original
+    const lineOfBusiness = selected.lineOfBusiness ?? '';
+    const team = routeRequest(service, lineOfBusiness, teams);
+    const actor = { id: user.id, name: user.displayName };
+    await createNumberedRequest(
+      requestNumber =>
+        createSupportingRequest(
+          { title: input.title, description: input.description, businessJustification: `Part of ${selected.requestNumber}: ${selected.title}`, neededBy: input.neededBy, lineOfBusiness },
+          service,
+          team,
+          selected,
+          user,
+          requestNumber
+        ),
+      requests.map(r => r.requestNumber),
+      {
+        id: selected.id,
+        patch: requestNumber => noteSupportingRequest(selected, { requestNumber, teamName: team?.name ?? '', serviceName: service.name }, actor)
+      }
+    );
+    reload();
   };
 
   const handleChange: RequestChange = async patch => {
@@ -188,8 +257,9 @@ const Requests = () => {
         )}
       </div>
 
-      <div className="card p-4 mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[14rem]">
+      <div className="card p-4 mb-4 space-y-3">
+        {/* Search on its own row, filters below */}
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
@@ -199,6 +269,7 @@ const Requests = () => {
             className="pl-9 w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500"
           />
         </div>
+        <div className="flex flex-wrap items-center gap-2">
         <select value={filters.serviceId} onChange={e => setFilter('serviceId', e.target.value)} className={selectClass} aria-label="Service">
           <option value="">All services</option>
           {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -226,6 +297,12 @@ const Requests = () => {
             {requesters.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>
         )}
+        {linesOfBusiness.length > 0 && (
+          <select value={filters.lineOfBusiness} onChange={e => setFilter('lineOfBusiness', e.target.value)} className={selectClass} aria-label="Line of business">
+            <option value="">Any line of business</option>
+            {linesOfBusiness.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+        )}
         {user.role === 'admin' && teams.length > 1 && (
           <select value={filters.teamId} onChange={e => setFilter('teamId', e.target.value)} className={selectClass} aria-label="Team">
             <option value="">All teams</option>
@@ -238,12 +315,6 @@ const Requests = () => {
         <label className="flex items-center gap-1 text-sm text-gray-600">
           to <input type="date" value={filters.createdTo} onChange={e => setFilter('createdTo', e.target.value)} className={selectClass} />
         </label>
-        {view === 'board' && (
-          <label className="flex items-center gap-1.5 text-sm text-gray-600">
-            <input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} className="rounded" />
-            Show deferred, declined &amp; cancelled
-          </label>
-        )}
         {activeFilterCount(filters) > 0 && (
           <button
             onClick={() => setFilters({ ...DEFAULT_FILTERS, scope: filters.scope })}
@@ -252,10 +323,40 @@ const Requests = () => {
             <X size={14} /> Clear filters
           </button>
         )}
+        </div>
       </div>
 
       {view === 'board' ? (
-        <PipelineBoard requests={visible} weeklyCapacityByUser={weeklyCapacityByUser} showClosed={showClosed} onOpen={setSelectedId} />
+        <>
+          <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Board">
+            {BOARDS.map(b => {
+              const count = counts[b.key];
+              const active = board === b.key;
+              return (
+                <button
+                  key={b.key}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setBoard(b.key)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    active ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {b.title}
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs tabular-nums ${active ? 'bg-gray-700' : 'bg-gray-100'}`}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+          <PipelineBoard
+            requests={visible}
+            weeklyCapacityByUser={weeklyCapacityByUser}
+            board={board}
+            supportingCounts={supportingCounts}
+            hiddenStatuses={hiddenStages}
+            onOpen={setSelectedId}
+          />
+        </>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
@@ -284,7 +385,10 @@ const Requests = () => {
                         <div className="text-xs font-mono text-gray-500">{r.requestNumber}</div>
                         <div className="font-medium text-gray-900">{r.title}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">{r.serviceName}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {r.serviceName}
+                        {r.lineOfBusiness && <div className="text-xs text-gray-500">{r.lineOfBusiness}</div>}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-700">{r.requesterName}</td>
                       <td className="px-6 py-4"><PriorityBadge priority={r.priority} overridden={!!r.priorityOverride} score={r.priorityScore} /></td>
                       <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
@@ -311,6 +415,7 @@ const Requests = () => {
           ) : (
             <NewRequestForm
               services={activeServices}
+              linesOfBusiness={linesOfBusiness}
               initialServiceId={newServiceId}
               onSubmit={handleCreate}
               onCancel={() => setNewServiceId(null)}
@@ -329,7 +434,10 @@ const Requests = () => {
             currentUser={user}
             users={users}
             requests={requests}
+            services={activeServices}
             onChange={handleChange}
+            onCreateSupporting={handleCreateSupporting}
+            onOpenRequest={setSelectedId}
           />
         </Modal>
       )}

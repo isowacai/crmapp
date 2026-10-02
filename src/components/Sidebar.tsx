@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, ClipboardList, Gauge, Settings2, Package, LogOut, User, Shield, Tags } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, ClipboardList, Gauge, UsersRound, LogOut, User, Shield, Tags } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import BrandMark from './BrandMark';
 import { canManageCatalog, canManageRequests } from '../lib/roles';
 
 const Sidebar = () => {
@@ -13,7 +14,7 @@ const Sidebar = () => {
     { to: '/services', icon: LayoutGrid, label: 'Service Catalog' },
     { to: '/requests', icon: ClipboardList, label: 'Demand' },
     { to: '/capacity', icon: Gauge, label: 'Capacity', leadAccess: true },
-    { to: '/workspace', icon: Settings2, label: 'Workspace', leadAccess: true },
+    { to: '/team', icon: UsersRound, label: 'Team', leadAccess: true },
     { to: '/categories', icon: Tags, label: 'Categories', managerAccess: true },
     { to: '/users', icon: Shield, label: 'Users', adminOnly: true },
   ];
@@ -36,9 +37,8 @@ const Sidebar = () => {
 
   return (
     <div className="bg-gray-900 text-white w-64 min-h-screen p-6 flex flex-col">
-      <div className="text-xl font-bold mb-10 pl-2 flex items-center gap-2 whitespace-nowrap">
-        <Package className="text-blue-500 shrink-0" size={24} />
-        <span>Dukaanley</span>
+      <div className="mb-10">
+        <BrandMark size="sm" />
       </div>
 
       {user && (
@@ -59,7 +59,7 @@ const Sidebar = () => {
       <nav className="space-y-2 flex-1">
         {filteredLinks.map((link) => {
           const Icon = link.icon;
-          const isActive = location.pathname === link.to;
+          const isActive = location.pathname === link.to || location.pathname.startsWith(`${link.to}/`);
           return (
             <Link
               key={link.to}

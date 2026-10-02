@@ -12,7 +12,9 @@ const COUNTERS = 'counters';
 // the write is an update, which security rules refuse, so an existing request is never overwritten.
 export const createNumberedRequest = async (
   build: (requestNumber: string) => Omit<ServiceRequest, 'id' | 'createdAt'>,
-  knownNumbers: string[] // used to seed today's counter the first time it's created
+  knownNumbers: string[], // used to seed today's counter the first time it's created
+  // Another request to update in the same transaction (e.g. note a supporting request on its original)
+  alsoUpdate?: { id: string; patch: (requestNumber: string) => Partial<ServiceRequest> }
 ): Promise<ServiceRequest> => {
   const day = toDateKey(new Date()).replace(/-/g, '');
   const counterRef = doc(db, COUNTERS, `REQ-${day}`);
@@ -26,6 +28,7 @@ export const createNumberedRequest = async (
     const data = { ...build(requestNumber), createdAt: Timestamp.now() };
     tx.set(counterRef, { last: next });
     tx.set(doc(db, COLLECTIONS.REQUESTS, requestNumber), data);
+    if (alsoUpdate) tx.update(doc(db, COLLECTIONS.REQUESTS, alsoUpdate.id), { ...alsoUpdate.patch(requestNumber), updatedAt: Timestamp.now() });
     return { ...data, id: requestNumber } as unknown as ServiceRequest;
   });
 };

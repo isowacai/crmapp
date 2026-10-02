@@ -10,7 +10,7 @@ export const StatusBadge = ({ status }: { status: RequestStatus }) => (
 
 // `overridden` marks a manager-assigned priority (vs. the calculated one)
 export const PriorityBadge = ({ priority, overridden, score }: { priority: PriorityLevel | ''; overridden?: boolean; score?: number | null }) =>
-  priority ? (
+  priority && PRIORITY_STYLES[priority] ? (
     <span
       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${PRIORITY_STYLES[priority].badge}`}
       title={overridden ? 'Set by a manager' : score != null ? `Calculated score ${score}/100` : undefined}

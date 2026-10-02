@@ -60,9 +60,10 @@ for (const name of categories) {
 let addedServices = 0;
 for (const service of services) {
   if (existingServices.has(service.name)) continue;
+  const { ownerTeam, ...fields } = service;
   await db.collection('services').add({
-    ...service,
-    teamId: teams.get(service.ownerTeam.toLowerCase()),
+    ...fields,
+    teamIds: [teams.get(ownerTeam.toLowerCase())],
     active: true,
     createdAt: Timestamp.now()
   });

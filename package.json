@@ -15,7 +15,10 @@
     "test": "vitest run",
     "test:rules": "node tests/emulator.mjs \"vitest run --config vitest.rules.config.ts\"",
     "test:migration": "node tests/emulator.mjs \"node tests/migration/e2e.mjs\"",
-    "migrate:teams": "node scripts/migrations/001-teams-and-pipeline.js"
+    "migrate:teams": "node scripts/migrations/001-teams-and-pipeline.js",
+    "check-rules-readiness": "node scripts/checkBeforeRules.js",
+    "backup-data": "node scripts/backupData.js",
+    "seed-sample-data": "vite-node scripts/seedSampleData.ts --"
   },
   "dependencies": {
     "firebase": "^10.8.0",

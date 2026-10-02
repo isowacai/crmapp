@@ -20,13 +20,20 @@ const PriorityModelEditor = ({
   criteria: initialCriteria,
   thresholds: initialThresholds,
   readOnly,
+  section = 'all',
+  saveLabel = 'Save priority model',
   onSave
 }: {
   criteria: AssessmentCriterion[];
   thresholds: PriorityThresholds;
   readOnly: boolean;
+  // 'criteria' = what demand is scored on; 'thresholds' = the resulting weights and priority cut-offs
+  section?: 'all' | 'criteria' | 'thresholds';
+  saveLabel?: string;
   onSave: (criteria: AssessmentCriterion[], thresholds: PriorityThresholds) => Promise<void>;
 }) => {
+  const showCriteria = section !== 'thresholds';
+  const showThresholds = section !== 'criteria';
   const [criteria, setCriteria] = useState<AssessmentCriterion[]>(initialCriteria);
   const [thresholds, setThresholds] = useState<PriorityThresholds>(initialThresholds);
   const [trial, setTrial] = useState<Record<string, number>>({});
@@ -65,6 +72,7 @@ const PriorityModelEditor = ({
 
   return (
     <div className="space-y-6">
+      {showCriteria && (<>
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-xs text-gray-500">
@@ -132,6 +140,8 @@ const PriorityModelEditor = ({
         </div>
       )}
 
+      </>)}
+
       {/* Weight shares as one stacked bar; legend carries names and values */}
       {active.length > 0 && (
         <div>
@@ -152,6 +162,7 @@ const PriorityModelEditor = ({
         </div>
       )}
 
+      {showThresholds && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <p className="text-sm font-medium text-gray-700 mb-2">Priority thresholds (score out of 100)</p>
@@ -202,6 +213,8 @@ const PriorityModelEditor = ({
         </div>
       </div>
 
+      )}
+
       {problems.length > 0 && (
         <ul className="p-3 rounded-lg bg-amber-50 text-amber-800 text-sm list-disc pl-6">
           {problems.map(p => <li key={p}>{p}</li>)}
@@ -213,8 +226,8 @@ const PriorityModelEditor = ({
 
       {!readOnly && (
         <div className="flex justify-end">
-          <button onClick={save} disabled={saving || !dirty || problems.length > 0} className="btn-primary disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save priority model'}
+          <button onClick={save} disabled={saving || (!dirty && section === 'all') || problems.length > 0} className="btn-primary disabled:opacity-50">
+            {saving ? 'Saving…' : saveLabel}
           </button>
         </div>
       )}

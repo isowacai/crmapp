@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import {
+  describe,
+  expect,
+  it } from 'vitest';
 import {
   addWorkingDays,
   allocateByWeek,
@@ -11,7 +14,12 @@ import {
   startOfWeek,
   summarizeTeams,
   toDateKey,
-  utilization
+  utilization,
+  allocateByDay,
+  calendarOf,
+  DEFAULT_CALENDAR,
+  standardWeek,
+  planWeeks
 } from './demand';
 import { ServiceRequest, User } from '../types';
 
@@ -27,6 +35,7 @@ const req = (overrides: Partial<ServiceRequest> = {}): ServiceRequest => ({
   title: 'T',
   description: '',
   businessJustification: '',
+  answers: [],
   requesterId: 'req',
   requesterName: 'Req',
   requesterTeam: '',
@@ -45,7 +54,20 @@ const req = (overrides: Partial<ServiceRequest> = {}): ServiceRequest => ({
   startDate: '',
   dueDate: '',
   assignedAt: '',
+  committedAt: '',
+  targetPeriod: '',
   completedAt: '',
+  actualStart: '',
+  progress: 0,
+  milestones: [],
+  blockers: [],
+  dependsOn: [],
+  parentId: '',
+  parentTeamId: '',
+  parentNumber: '',
+  parentTitle: '',
+  parentTeamName: '',
+  outcome: null,
   history: [],
   createdAt: { seconds: 0, nanoseconds: 0 },
   ...overrides
@@ -169,5 +191,42 @@ describe('logged hours', () => {
     expect(plannedInWeeks(r, week)).toBe(12);
     expect(plannedInWeeks({ ...r, status: 'blocked' }, week)).toBe(0);
     expect(plannedInWeeks({ ...r, status: 'planned' }, week)).toBe(0);
+  });
+});
+
+describe('working week', () => {
+  // 2026-10-05 is a Monday
+  const plan = { estimatedHours: 32, startDate: '2026-10-05', dueDate: '2026-10-11' };
+
+  it('defaults to Monday–Friday, 8 hours a day', () => {
+    expect(calendarOf(undefined)).toEqual(DEFAULT_CALENDAR);
+    expect(standardWeek(calendarOf({ hoursPerDay: 7 }))).toBe(35);
+  });
+
+  it("spreads estimates over the team's working days only", () => {
+    const fourDays = calendarOf({ workingDays: [4, 1, 3, 2], hoursPerDay: 7 }); // Mon–Thu, given in any order
+    expect(fourDays.workingDays).toEqual([1, 2, 3, 4]);
+    expect([...allocateByDay(plan, fourDays).entries()]).toEqual([
+      ['2026-10-05', 8], ['2026-10-06', 8], ['2026-10-07', 8], ['2026-10-08', 8]
+    ]);
+    expect(allocateByDay(plan).size).toBe(5); // Mon–Fri by default
+    expect(allocateByWeek(plan, fourDays).get('2026-10-05')).toBe(32);
+  });
+});
+
+describe('weekly split by hand', () => {
+  // Monday 2026-10-05 → Friday 2026-10-16: two weeks
+  const plan = { estimatedHours: 30, startDate: '2026-10-07', dueDate: '2026-10-16', weeklyPlan: { '2026-10-05': 6, '2026-10-12': 24 } };
+
+  it('uses the hours given for each week, spread over that week’s working days in the plan', () => {
+    expect([...allocateByWeek(plan).entries()]).toEqual([['2026-10-05', 6], ['2026-10-12', 24]]);
+    const days = allocateByDay(plan);
+    expect(days.get('2026-10-05')).toBeUndefined(); // before the start date
+    expect(days.get('2026-10-07')).toBe(2); // 6 h over Wed–Fri
+    expect(days.get('2026-10-12')).toBe(4.8); // 24 h over Mon–Fri
+  });
+
+  it('lists the weeks a plan touches', () => {
+    expect(planWeeks('2026-10-07', '2026-10-16')).toEqual(['2026-10-05', '2026-10-12']);
   });
 });

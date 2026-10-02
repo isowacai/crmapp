@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, Eye, EyeOff, Home } from 'lucide-react';
+import { Eye, EyeOff, Home } from 'lucide-react';
+import BrandMark from '../components/BrandMark';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
@@ -101,15 +102,7 @@ const Login = () => {
       <div className="bg-gray-900 border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500 bg-opacity-10 rounded-xl">
-                <Package className="text-blue-400" size={32} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Dukaan</h1>
-                <p className="text-blue-400 text-sm">Business Management System</p>
-              </div>
-            </div>
+            <BrandMark />
             <button
               onClick={() => navigate('/')}
               className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"

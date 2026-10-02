@@ -30,3 +30,6 @@ config/serviceAccountKey.json
 # Firebase emulator logs
 firestore-debug.log
 firebase-debug.log
+
+# Data backups (contain real data)
+backups/

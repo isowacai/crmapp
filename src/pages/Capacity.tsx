@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useWorkCalendar } from '../hooks/useWorkCalendar';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Gauge, ChevronLeft, ChevronRight, AlertTriangle, Pencil } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
@@ -22,12 +23,14 @@ import {
   weekKeys
 } from '../lib/demand';
 import { Service, Team, User } from '../types';
+import { deliversService } from '../lib/catalog';
 import { renameTeam } from '../services/teamService';
 import Modal from '../components/Modal';
 import PersonCapacity from '../components/capacity/PersonCapacity';
 import RenameTeamForm from '../components/capacity/RenameTeamForm';
 import TeamCapacity from '../components/capacity/TeamCapacity';
 import TeamConsumptionTable from '../components/capacity/TeamConsumptionTable';
+import ForecastView from '../components/capacity/ForecastView';
 
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
@@ -40,6 +43,7 @@ const Capacity = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [renamingTeam, setRenamingTeam] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [tab, setTab] = useState<'weekly' | 'forecast'>('weekly');
   const canRenameTeams = canManageCatalog(user?.role);
   const location = useLocation();
   const navigate = useNavigate();
@@ -66,7 +70,8 @@ const Capacity = () => {
   );
   const thisWeek = toDateKey(startOfWeek(new Date()));
 
-  const rows = useMemo(() => buildCapacity(scopedUsers, requests, weeks), [scopedUsers, requests, weeks]);
+  const calendar = useWorkCalendar();
+  const rows = useMemo(() => buildCapacity(scopedUsers, requests, weeks, calendar), [scopedUsers, requests, weeks, calendar]);
   const logged = useMemo(() => loggedByUserWeek(requests), [requests]);
 
   const teams = [...new Set(rows.map(r => r.team))].sort();
@@ -75,7 +80,10 @@ const Capacity = () => {
 
   // Everyone in a team (including inactive users); "Unassigned" means no team set
   const teamMembers = (team: string) => users.filter(u => (team === UNASSIGNED_TEAM ? !u.teamId : u.team === team));
-  const teamServices = (team: string) => (team === UNASSIGNED_TEAM ? [] : services.filter(s => s.ownerTeam === team));
+  const teamServices = (team: string) => {
+    const id = teamDocs.find(t => t.name === team)?.id;
+    return team === UNASSIGNED_TEAM || !id ? [] : services.filter(s => deliversService(s, id));
+  };
 
   const handleRenameTeam = async (oldName: string, newName: string) => {
     await renameTeam(oldName, newName, { teams: teamDocs, users, services, canCreate: user?.role === 'admin' }, {
@@ -93,6 +101,17 @@ const Capacity = () => {
   const cellHours = (row: CapacityRow, week: string) => (view === 'planned' ? row.allocated[week] : loggedFor(row, week));
 
   const teamSummaries = summarizeTeams(rows, weeks, logged).filter(t => teamFilter === 'all' || t.team === teamFilter);
+
+  // Forecast scope: the selected team's people and demand (leads/managers: their own team)
+  const forecastUsers = useMemo(
+    () => (teamFilter === 'all' ? scopedUsers : scopedUsers.filter(u => (u.team || UNASSIGNED_TEAM) === teamFilter)),
+    [scopedUsers, teamFilter]
+  );
+  const forecastTeamIds = useMemo(() => {
+    if (teamFilter === 'all') return user?.role === 'admin' ? undefined : new Set([user?.teamId ?? '']);
+    const ids = teamDocs.filter(t => t.name === teamFilter).map(t => t.id);
+    return new Set(teamFilter === UNASSIGNED_TEAM ? [...ids, ''] : ids);
+  }, [teamFilter, teamDocs, user?.role, user?.teamId]);
 
   const totals = {
     capacity: sum(teamSummaries.flatMap(t => weeks.map(w => t.capacity[w]))),
@@ -144,10 +163,11 @@ const Capacity = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold">Capacity</h1>
-            <p className="text-gray-500 text-sm">Planned and actual load against each person's weekly capacity</p>
+            <p className="text-gray-500 text-sm">Committed and actual load against capacity, and the forecast ahead</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {tab === 'weekly' && (
           <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
             {(['planned', 'logged'] as const).map(v => (
               <button
@@ -155,14 +175,16 @@ const Capacity = () => {
                 onClick={() => setView(v)}
                 className={`px-3 py-2 text-sm font-medium ${view === v ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
               >
-                {v === 'planned' ? 'Planned' : 'Actual (logged)'}
+                {v === 'planned' ? 'Committed' : 'Actual (logged)'}
               </button>
             ))}
           </div>
+          )}
           <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="rounded-lg border-gray-300 text-sm">
             <option value="all">All teams</option>
             {teams.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
+          {tab === 'weekly' && (<>
           <select value={weekCount} onChange={e => setWeekCount(Number(e.target.value))} className="rounded-lg border-gray-300 text-sm">
             <option value={4}>4 weeks</option>
             <option value={8}>8 weeks</option>
@@ -179,8 +201,30 @@ const Capacity = () => {
               <ChevronRight size={18} />
             </button>
           </div>
+          </>)}
         </div>
       </div>
+
+      <div className="flex gap-1 border-b border-gray-200 mb-6">
+        {([['weekly', 'Weekly'], ['forecast', 'Forecast']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'forecast' ? (
+        <ForecastView
+          users={forecastUsers}
+          requests={requests}
+          teamIds={forecastTeamIds}
+          onOpenRequest={id => navigate('/requests', { state: { openRequestId: id } })}
+        />
+      ) : (<>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="stat-card">
@@ -188,7 +232,7 @@ const Capacity = () => {
           <p className="text-3xl font-bold mt-1">{formatHours(totals.capacity)}</p>
         </div>
         <div className="stat-card">
-          <p className="text-gray-600 text-sm font-medium">Planned consumption</p>
+          <p className="text-gray-600 text-sm font-medium">Committed consumption</p>
           <p className="text-3xl font-bold mt-1">{utilization(totals.planned, totals.capacity)}%</p>
           <p className="text-sm text-gray-500">{formatHours(totals.planned)} planned</p>
         </div>
@@ -215,7 +259,7 @@ const Capacity = () => {
         <div className="p-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold">Team consumption</h2>
           <p className="text-sm text-gray-500">
-            {view === 'planned' ? 'Planned hours' : 'Logged hours'} as a share of the team's combined weekly capacity
+            {view === 'planned' ? 'Committed hours' : 'Logged hours'} as a share of the team's combined weekly capacity
           </p>
         </div>
         <TeamConsumptionTable
@@ -246,7 +290,7 @@ const Capacity = () => {
             <h2 className="text-lg font-semibold">People</h2>
             <p className="text-sm text-gray-500">
               {view === 'planned'
-                ? 'Estimated hours of assigned and in-progress requests, spread over their planned dates'
+                ? 'Estimated hours of committed and in-progress work, spread over its planned dates'
                 : 'Hours logged on requests'}
             </p>
           </div>
@@ -295,6 +339,8 @@ const Capacity = () => {
           </table>
         </div>
       </div>
+
+      </>)}
 
       {renamingTeam && (
         <Modal
