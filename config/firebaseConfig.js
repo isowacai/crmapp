@@ -57,3 +57,6 @@ function loadFirebaseConfig() {
 }
 
 export const firebaseConfig = loadFirebaseConfig();
+
+// Any other value from dev.properties (e.g. firebase.serviceAccountPath), or undefined
+export const readProperty = key => parseProperties(readFileSync(PROPERTIES_PATH, 'utf8'))[key];

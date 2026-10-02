@@ -1,0 +1,252 @@
+rules_version = '2';
+
+// Access rules for the demand-management app. Roles come from users/{uid}.role, team from users/{uid}.teamId:
+//   staff (and legacy 'customer') – raise requests; see and work on their own/assigned requests
+//   lead, manager                 – assess, prioritize, plan, and see their own team's demand;
+//                                   edit their team's workspace settings
+//   manager                       – also edits their team's catalog services and team membership names
+//   admin                         – everything, across all teams, plus users and teams
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasProfile() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function myRole() {
+      return hasProfile() ? myProfile().get('role', 'staff') : 'none';
+    }
+
+    function myTeamId() {
+      return hasProfile() ? myProfile().get('teamId', '') : '';
+    }
+
+    function isAdmin() {
+      return myRole() == 'admin';
+    }
+
+    function isCatalogManager() {
+      return myRole() in ['admin', 'manager'];
+    }
+
+    function isRequestManager() {
+      return myRole() in ['admin', 'manager', 'lead'];
+    }
+
+    // A lead/manager of this team, or an admin
+    function managesTeam(teamId) {
+      return isAdmin() || (isRequestManager() && myTeamId() != '' && teamId == myTeamId());
+    }
+
+    // The update only touches the listed fields
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ---------- Users ----------
+
+    match /users/{uid} {
+      allow read: if signedIn();
+
+      // Self-registration always starts as staff; an admin can promote afterwards
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'staff';
+
+      allow update: if isAdmin()
+        // Anyone can change their own display name
+        || (request.auth.uid == uid && onlyChanges(['displayName', 'lastLogin', 'updatedAt']))
+        // On the Team page a manager adds people who have no team to their own team, removes their own
+        // members, and sets their weekly hours and rate; they can't take people from another team
+        || (isCatalogManager() && myTeamId() != ''
+            && resource.data.get('teamId', '') in ['', myTeamId()]
+            && request.resource.data.get('teamId', '') in ['', myTeamId()]
+            && onlyChanges(['team', 'teamId', 'weeklyCapacityHours', 'hourlyRate', 'updatedAt']))
+        // A team's leads set their own members' weekly hours and rate
+        || (isRequestManager() && myTeamId() != '' && resource.data.get('teamId', '') == myTeamId()
+            && onlyChanges(['weeklyCapacityHours', 'hourlyRate', 'updatedAt']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Teams (workspaces) ----------
+
+    match /teams/{teamId} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      // A team's leads and managers configure its workspace (criteria, priority model, details)
+      allow update: if managesTeam(teamId);
+    }
+
+    // ---------- Service catalog ----------
+
+    match /categories/{id} {
+      allow read: if signedIn();
+      allow write: if isCatalogManager();
+    }
+
+    // A service can be delivered by several teams (teamIds), each separately. Services saved before
+    // that have a single teamId instead.
+    function deliveringTeams(data) {
+      return data.get('teamIds', data.get('teamId', '') == '' ? [] : [data.teamId]);
+    }
+
+    match /services/{id} {
+      allow read: if signedIn();
+
+      // The delivering teams other than the manager's own are left exactly as they were
+      function onlyOwnTeamChanged() {
+        let mine = [myTeamId()].toSet();
+        return deliveringTeams(request.resource.data).toSet().difference(mine) == deliveringTeams(resource.data).toSet().difference(mine);
+      }
+
+      // Managers add services delivered by their own team; admins any
+      allow create: if isAdmin()
+        || (isCatalogManager() && myTeamId() != '' && request.resource.data.teamIds == [myTeamId()]);
+      allow update: if isAdmin()
+        // A delivering team's manager maintains the shared description and questions, and can stop
+        // delivering it, but can't add or remove other teams
+        || (isCatalogManager() && myTeamId() != ''
+            && myTeamId() in deliveringTeams(resource.data)
+            && onlyOwnTeamChanged())
+        // Any manager can start delivering a service too ("Also deliver this")
+        || (isCatalogManager() && myTeamId() != ''
+            && onlyChanges(['teamIds', 'teamId', 'ownerTeam'])
+            && myTeamId() in deliveringTeams(request.resource.data)
+            && onlyOwnTeamChanged());
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Request numbering ----------
+
+    // One counter per day (REQ-YYYYMMDD) that only ever counts up by one
+    match /counters/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && id.matches('REQ-[0-9]{8}')
+        && request.resource.data.keys().hasOnly(['last'])
+        && request.resource.data.last is int && request.resource.data.last > 0;
+      allow update: if signedIn()
+        && request.resource.data.keys().hasOnly(['last'])
+        && request.resource.data.last == resource.data.last + 1;
+    }
+
+    // ---------- Demand (service requests) ----------
+
+    match /requests/{id} {
+      function isRequester() {
+        return resource.data.requesterId == request.auth.uid;
+      }
+
+      function isAssignee() {
+        return resource.data.assigneeId == request.auth.uid;
+      }
+
+      // Every update appends exactly one history entry, written as the signed-in user
+      function appendsOwnHistoryEntry() {
+        let before = resource.data.history;
+        let after = request.resource.data.history;
+        return after.size() == before.size() + 1
+          && after[before.size()].byId == request.auth.uid;
+      }
+
+      // Leads of the team that owns the original see the supporting requests raised under it
+      function managesParent() {
+        return managesTeam(resource.data.get('parentTeamId', ''));
+      }
+
+      // `resource == null` lets anyone check whether a request number is free
+      allow get: if signedIn() && (resource == null || managesTeam(resource.data.teamId) || managesParent() || isRequester() || isAssignee());
+
+      // Queries must be limited to demand the user may see: their team's (leads/managers),
+      // or what they raised or own
+      allow list: if signedIn() && (
+        managesTeam(resource.data.teamId)
+        || managesParent()
+        || resource.data.requesterId == request.auth.uid
+        || resource.data.assigneeId == request.auth.uid
+      );
+
+      // A supporting request must be raised by a lead/manager of the original's team, pointing at a real original
+      function validParentLink() {
+        let parentId = request.resource.data.get('parentId', '');
+        return parentId == ''
+          || (managesTeam(request.resource.data.parentTeamId)
+              && get(/databases/$(database)/documents/requests/$(parentId)).data.teamId == request.resource.data.parentTeamId);
+      }
+
+      // The service's team may limit who can request its services; its own members and supporting
+      // requests raised by another team's managers are always allowed
+      function requestAllowed() {
+        let teamId = request.resource.data.teamId;
+        let teamPath = /databases/$(database)/documents/teams/$(teamId);
+        let access = exists(teamPath) ? get(teamPath).data.get('requestAccess', { 'mode': 'everyone', 'teamIds': [] }) : { 'mode': 'everyone', 'teamIds': [] };
+        return access.mode == 'everyone'
+          || myTeamId() == teamId
+          || (myTeamId() != '' && myTeamId() in access.teamIds)
+          || request.resource.data.get('parentId', '') != '';
+      }
+
+      // New demand arrives unassessed, raised by the signed-in user, owned by one of the teams that
+      // deliver the service, with the request number as the ID
+      allow create: if signedIn()
+        && requestAllowed()
+        && validParentLink()
+        && request.resource.data.get('milestones', []).size() == 0
+        && request.resource.data.get('blockers', []).size() == 0
+        && request.resource.data.get('progress', 0) == 0
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.requestNumber == id
+        && request.resource.data.status == 'new'
+        && request.resource.data.assigneeId == ''
+        && request.resource.data.priority == ''
+        && request.resource.data.priorityOverride == null
+        && request.resource.data.assessments.size() == 0
+        && request.resource.data.estimatedHours == 0
+        && request.resource.data.loggedHours == 0
+        && request.resource.data.teamId != ''
+        && request.resource.data.teamId in deliveringTeams(get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data)
+        && request.resource.data.history.size() == 1
+        && request.resource.data.history[0].byId == request.auth.uid;
+
+      allow update: if signedIn() && appendsOwnHistoryEntry() && (
+        // The owning team's leads/managers manage it, but can't move it to another team or re-link it
+        (managesTeam(resource.data.teamId)
+          && (isAdmin() || (request.resource.data.teamId == resource.data.teamId
+              && request.resource.data.get('parentId', '') == resource.data.get('parentId', '')
+              && request.resource.data.get('parentTeamId', '') == resource.data.get('parentTeamId', ''))))
+        // The delivery owner works it: start, block, unblock, progress, milestones, log hours, complete, comment
+        || (isAssignee()
+            && onlyChanges(['status', 'loggedHours', 'completedAt', 'history', 'updatedAt', 'actualStart', 'progress', 'milestones', 'blockers'])
+            && request.resource.data.status in ['committed', 'in-progress', 'blocked', 'completed']
+            && request.resource.data.loggedHours >= resource.data.loggedHours)
+        // The requester can comment (e.g. answer a request for information), or cancel open demand
+        || (isRequester() && onlyChanges(['history', 'updatedAt']))
+        || (isRequester()
+            && onlyChanges(['status', 'history', 'updatedAt'])
+            && request.resource.data.status == 'cancelled'
+            && resource.data.status in ['new', 'assessing', 'approved', 'planned', 'committed', 'blocked', 'deferred'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Retired CRM data ----------
+
+    // Kept for reference: admins can read it; nobody can change it from the app
+    match /customers/{id} { allow read: if isAdmin(); }
+    match /products/{id} { allow read: if isAdmin(); }
+    match /orders/{id} { allow read: if isAdmin(); }
+    match /tasks/{id} { allow read: if isAdmin(); }
+
+    // Everything else is denied by default
+  }
+}

@@ -17,13 +17,15 @@ const ColumnChart = ({
   series,
   height = 200,
   showValues = false,
-  unit = ''
+  unit = '',
+  onSelect
 }: {
   categories: string[];
   series: ColumnSeries[];
   height?: number;
   showValues?: boolean; // value on each column cap; use only for a handful of columns
   unit?: string;
+  onSelect?: (index: number) => void; // click a column group to drill down
 }) => {
   const { containerProps, show, tooltip } = useChartTooltip();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -81,7 +83,8 @@ const ColumnChart = ({
             {categories.map((cat, i) => (
               <div
                 key={cat}
-                className={`flex-1 flex items-end justify-center gap-0.5 rounded-t-md transition-colors ${activeIndex === i ? 'bg-gray-100/70' : ''}`}
+                className={`flex-1 flex items-end justify-center gap-0.5 rounded-t-md transition-colors ${activeIndex === i ? 'bg-gray-100/70' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
+                onClick={onSelect ? () => onSelect(i) : undefined}
                 onMouseMove={e => { setActiveIndex(i); show(e, tipFor(i)); }}
                 onMouseLeave={() => setActiveIndex(null)}
               >

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useWorkCalendar } from '../../hooks/useWorkCalendar';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { ServiceRequest } from '../../types';
@@ -44,6 +45,7 @@ const PersonCapacity = ({
   const [filter, setFilter] = useState<RequestFilter>('open');
 
   const weekSet = useMemo(() => new Set(weeks), [weeks]);
+  const calendar = useWorkCalendar();
 
   const personRequests: PersonRequest[] = useMemo(() => {
     const me = new Set([row.userId]);
@@ -54,7 +56,7 @@ const PersonCapacity = ({
 
       result.push({
         request: r,
-        plannedInPeriod: r.assigneeId === row.userId ? plannedInWeeks(r, weekSet) : 0,
+        plannedInPeriod: r.assigneeId === row.userId ? plannedInWeeks(r, weekSet, calendar) : 0,
         loggedInPeriod: loggedOn(r, { byIds: me, weeks: weekSet }),
         loggedByPerson
       });

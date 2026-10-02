@@ -18,12 +18,14 @@ const BarChart = ({
   data,
   max,
   reference,
-  emptyText = 'No data yet'
+  emptyText = 'No data yet',
+  onSelect
 }: {
   data: BarDatum[];
   max?: number;
   reference?: { value: number; label: string };
   emptyText?: string;
+  onSelect?: (key: string) => void; // click a bar to drill down
 }) => {
   const { containerProps, show, tooltip } = useChartTooltip();
   const [active, setActive] = useState<string | null>(null);
@@ -41,7 +43,8 @@ const BarChart = ({
         {data.map(d => (
           <div
             key={d.key}
-            className={`grid grid-cols-[minmax(0,9rem)_1fr] items-center gap-3 rounded-md px-1 py-0.5 transition-colors ${active === d.key ? 'bg-gray-100/70' : ''}`}
+            className={`grid grid-cols-[minmax(0,9rem)_1fr] items-center gap-3 rounded-md px-1 py-0.5 transition-colors ${active === d.key ? 'bg-gray-100/70' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
+            onClick={onSelect ? () => onSelect(d.key) : undefined}
             onMouseMove={e => {
               setActive(d.key);
               show(e, (

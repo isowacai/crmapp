@@ -55,7 +55,7 @@ const Profile = () => {
     try {
       await signOut();
       navigate('/login');
-    } catch (error) {
+    } catch {
       setError('Failed to sign out');
     }
   };
